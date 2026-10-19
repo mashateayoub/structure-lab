@@ -1,0 +1,81 @@
+pipeline {
+  agent { label 'launchdeck-docker' }
+  options { disableConcurrentBuilds(); timeout(time: 30, unit: 'MINUTES') }
+  parameters { string(name: 'ROLLBACK_SHA', defaultValue: '', description: 'Optional full commit SHA of an image already deployed by Launchdeck') }
+  environment {
+    SSH_HOST = 'ec2-13-60-169-45.eu-north-1.compute.amazonaws.com'
+    SSH_USER = 'ec2-user'
+    SSH_PORT = '22'
+    DEPLOY_DIR = '.launchdeck/1af5c32a-e0ff-47e3-8dc8-0a455f995a24'
+    HEALTH_PATH = '/'
+  }
+  stages {
+    stage('Validate revision') {
+      steps {
+        script {
+          if (params.ROLLBACK_SHA && !(params.ROLLBACK_SHA ==~ /[a-f0-9]{40}/)) error('Rollback requires a full commit SHA')
+          if (!params.ROLLBACK_SHA && !(env.GIT_COMMIT ==~ /[a-f0-9]{40}/)) error('Checkout did not provide a full commit SHA')
+          env.DEPLOY_SHA = params.ROLLBACK_SHA ?: env.GIT_COMMIT
+          env.IMAGE_REF = 'launchdeck-1af5c32a-e0ff-47e3-8dc8-0a455f995a24:' + env.DEPLOY_SHA
+          currentBuild.description = env.DEPLOY_SHA
+        }
+      }
+    }
+    stage('Test') {
+      when { expression { !params.ROLLBACK_SHA } }
+      steps {
+        sh '''#!/usr/bin/env bash
+          set -euo pipefail
+          if [[ -f package-lock.json ]]; then
+            npm ci
+            npm run lint --if-present
+            npm run typecheck --if-present
+            if node -e 'process.exit((require("./package.json").scripts || {})["test:ci"] ? 0 : 1)'; then
+              npm run test:ci
+            else
+              CI=true npm run test --if-present
+            fi
+          fi
+        '''
+      }
+    }
+    stage('Build image') {
+      when { expression { !params.ROLLBACK_SHA } }
+      steps { sh 'docker build --platform linux/amd64 -t "$IMAGE_REF" .' }
+    }
+    stage('Prepare EC2') {
+      steps {
+        withCredentials([sshUserPrivateKey(credentialsId: 'launchdeck-1af5c32a-e0ff-47e3-8dc8-0a455f995a24-ssh', keyFileVariable: 'SSH_KEY'), string(credentialsId: 'launchdeck-1af5c32a-e0ff-47e3-8dc8-0a455f995a24-known-hosts', variable: 'KNOWN_HOSTS')]) {
+          sh '''#!/usr/bin/env bash
+            set -euo pipefail
+            umask 077
+            mkdir -p "$WORKSPACE/.launchdeck-ssh"
+            printf '%s\\n' "$KNOWN_HOSTS" > "$WORKSPACE/.launchdeck-ssh/known_hosts"
+            SSH_OPTS="-i $SSH_KEY -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$WORKSPACE/.launchdeck-ssh/known_hosts -o ConnectTimeout=20"
+            STAGING="${BUILD_NUMBER}-${BUILD_NUMBER}"
+            ssh $SSH_OPTS -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "mkdir -p $DEPLOY_DIR/.incoming-$STAGING"
+            scp $SSH_OPTS -P "$SSH_PORT" .launchdeck/1af5c32a-e0ff-47e3-8dc8-0a455f995a24/bootstrap.sh .launchdeck/1af5c32a-e0ff-47e3-8dc8-0a455f995a24/compose.yaml .launchdeck/1af5c32a-e0ff-47e3-8dc8-0a455f995a24/deploy.sh "$SSH_USER@$SSH_HOST:$DEPLOY_DIR/.incoming-$STAGING/"
+            ssh $SSH_OPTS -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "bash $DEPLOY_DIR/.incoming-$STAGING/bootstrap.sh"
+          '''
+        }
+      }
+    }
+    stage('Transfer image and deploy') {
+      steps {
+        withCredentials([sshUserPrivateKey(credentialsId: 'launchdeck-1af5c32a-e0ff-47e3-8dc8-0a455f995a24-ssh', keyFileVariable: 'SSH_KEY'), string(credentialsId: 'launchdeck-1af5c32a-e0ff-47e3-8dc8-0a455f995a24-known-hosts', variable: 'KNOWN_HOSTS')]) {
+          sh '''#!/usr/bin/env bash
+            set -euo pipefail
+            printf '%s\\n' "$KNOWN_HOSTS" > "$WORKSPACE/.launchdeck-ssh/known_hosts"
+            SSH_OPTS="-i $SSH_KEY -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$WORKSPACE/.launchdeck-ssh/known_hosts -o ConnectTimeout=20"
+            STAGING="${BUILD_NUMBER}-${BUILD_NUMBER}"
+            if [[ -z "${ROLLBACK_SHA:-}" ]]; then
+              docker save "$IMAGE_REF" | ssh $SSH_OPTS -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" 'docker load'
+            fi
+            ssh $SSH_OPTS -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "bash $DEPLOY_DIR/.incoming-$STAGING/deploy.sh '$DEPLOY_SHA' '$STAGING'"
+          '''
+        }
+      }
+    }
+  }
+  post { always { sh 'rm -rf "$WORKSPACE/.launchdeck-ssh"' } }
+}

@@ -1,0 +1,12 @@
+name: launchdeck-1af5c32a-e0ff-47e3-8dc8-0a455f995a24
+services:
+  app:
+    image: ${IMAGE_REF:?Image required}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5000:3000"
+    env_file: .env.production
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: "3000"
