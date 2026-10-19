@@ -52,7 +52,11 @@ rollback() {
 trap rollback ERR INT TERM
 compose up -d --no-deps --pull never app
 healthy "$health_url"
-
+for attempt in {1..5}; do
+  if curl --fail --silent --show-error --max-time 20 'https://lab.mashateayoub.com/' >/dev/null; then break; fi
+  [[ $attempt == 5 ]] && exit 1
+  sleep 2
+done
 if [[ -n $previous && $previous != "$IMAGE_REF" ]]; then
   printf '%s\n' "$previous" >.deployment/previous.tmp
   mv .deployment/previous.tmp .deployment/previous
