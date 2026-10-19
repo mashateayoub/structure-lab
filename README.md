@@ -24,6 +24,25 @@ Open the printed preview address (normally http://localhost:4173). Deploy the ge
 
 For a quick view of the included prebuilt app without installing npm dependencies, run `python3 -m http.server 8080 --directory dist` from the project folder and open http://localhost:8080 (requires Python 3).
 
+## Docker
+
+Build and run the production app with Docker; no local Node.js installation is required:
+
+```sh
+docker build -t structure-lab .
+docker run --rm -p 8080:8080 --name structure-lab structure-lab
+```
+
+Open http://localhost:8080. Stop the foreground container with Ctrl+C. If port 8080 is occupied, use `-p 8081:8080` and open http://localhost:8081.
+
+The multi-stage Dockerfile installs locked dependencies, runs the unit tests and production build, and copies only the compiled app into Nginx. The server runs as the unprivileged `nginx` user on port 8080 and includes an HTTP health check. Monaco and its workers are served from the same container. Image pulls and npm installation require internet access during the first build; runtime does not need an editor CDN. Base-image tags track Node 22 and stable Alpine Nginx updates; use `docker build --pull -t structure-lab .` to refresh them.
+
+To run the existing browser tests against a running container (requires local npm dependencies and a Playwright browser):
+
+```sh
+PLAYWRIGHT_BASE_URL=http://127.0.0.1:8080 npm run test:e2e
+```
+
 ## What is included
 
 | Module       | Interactive experience                                                                                      |
