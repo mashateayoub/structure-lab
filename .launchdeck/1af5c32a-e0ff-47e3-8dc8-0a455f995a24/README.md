@@ -2,7 +2,7 @@
 
 2. The first deployment runs an idempotent host bootstrap over SSH. It supports Ubuntu, Debian, Amazon Linux 2 and Amazon Linux 2023; it installs Docker Engine, Compose v2, Bash, curl and flock, enables Docker, and creates the project directory. The SSH user must have passwordless sudo for first-time setup. The bootstrap adds the user to the docker group; Docker group membership grants root-equivalent access. Match the image architecture to the EC2 processor.
 
-3. On EC2 create $HOME/.launchdeck/1af5c32a-e0ff-47e3-8dc8-0a455f995a24/.env.production with runtime secrets before the first deploy (chmod 600). Deployment preserves this file. Your app must listen on 0.0.0.0:3000 inside the container and return HTTP 2xx or 3xx from /.
+3. On EC2 create $HOME/.launchdeck/1af5c32a-e0ff-47e3-8dc8-0a455f995a24/.env.production with runtime secrets before the first deploy (chmod 600). Deployment preserves this file. Your app must listen on 0.0.0.0:8080 inside the container and return HTTP 2xx or 3xx from /.
 
 4. Reserve host port 5000 for this project and configure Caddy or Nginx with HTTPS to proxy your domain to 127.0.0.1:5000. Add a domain in project settings to have Launchdeck configure Caddy automatically.
 
