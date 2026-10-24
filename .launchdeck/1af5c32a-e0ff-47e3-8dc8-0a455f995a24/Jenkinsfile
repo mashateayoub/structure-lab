@@ -1,18 +1,27 @@
 pipeline {
   agent { label 'launchdeck-docker' }
   options { disableConcurrentBuilds(); timeout(time: 30, unit: 'MINUTES') }
-  parameters { string(name: 'ROLLBACK_SHA', defaultValue: '', description: 'Optional full commit SHA of an image already deployed by Launchdeck') }
+  parameters { choice(name: 'OPERATION', choices: ['deploy', 'backup', 'verify-backup', 'restore'], description: 'Deployment or explicit database operation'); string(name: 'BACKUP_ID', defaultValue: '', description: 'Backup identifier'); booleanParam(name: 'CONFIRM_RESTORE', defaultValue: false, description: 'Explicitly authorize database restoration'); booleanParam(name: 'CONFIRM_MIGRATION', defaultValue: false, description: 'Authorize a manually reviewed migration'); string(name: 'ROLLBACK_SHA', defaultValue: '', description: 'Optional full commit SHA of an image already deployed by Launchdeck') }
   environment {
     SSH_HOST = 'ec2-13-60-169-45.eu-north-1.compute.amazonaws.com'
     SSH_USER = 'ec2-user'
     SSH_PORT = '22'
     DEPLOY_DIR = '.launchdeck/1af5c32a-e0ff-47e3-8dc8-0a455f995a24'
     HEALTH_PATH = '/'
+    DEPLOYMENT_MODE = 'dockerfile'
+    COMPOSE_FILE = 'compose.yaml'
+    DOCKER_TARGET = ''
+    DOCKERFILE_PATH = 'Dockerfile'
+    BUILD_CONTEXT = '.'
   }
   stages {
     stage('Validate revision') {
       steps {
         script {
+          env.OPERATION = params.OPERATION ?: 'deploy'
+          if (env.OPERATION == 'restore' && !params.CONFIRM_RESTORE) error('Database restore requires explicit confirmation')
+          if (params.BACKUP_ID && !(params.BACKUP_ID ==~ /[A-Za-z0-9][A-Za-z0-9_.-]{0,99}/)) error('Invalid backup identifier')
+          if (env.OPERATION == 'deploy' && !params.ROLLBACK_SHA && 'backward-compatible' == 'manual' && '' && !params.CONFIRM_MIGRATION) error('Migration requires explicit confirmation')
           if (params.ROLLBACK_SHA && !(params.ROLLBACK_SHA ==~ /[a-f0-9]{40}/)) error('Rollback requires a full commit SHA')
           if (!params.ROLLBACK_SHA && !(env.GIT_COMMIT ==~ /[a-f0-9]{40}/)) error('Checkout did not provide a full commit SHA')
           env.DEPLOY_SHA = params.ROLLBACK_SHA ?: env.GIT_COMMIT
@@ -21,31 +30,75 @@ pipeline {
         }
       }
     }
-    stage('Test') {
-      when { expression { !params.ROLLBACK_SHA } }
+    stage('Build image') {
+      when { expression { env.OPERATION == 'deploy' && !params.ROLLBACK_SHA && env.DEPLOYMENT_MODE == 'dockerfile' } }
+      steps { withCredentials([string(credentialsId: 'launchdeck-1af5c32a-e0ff-47e3-8dc8-0a455f995a24-build-secrets', variable: 'BUILD_SECRETS'), usernamePassword(credentialsId: 'launchdeck-1af5c32a-e0ff-47e3-8dc8-0a455f995a24-registry', usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASSWORD')]) { sh '''#!/usr/bin/env bash
+        set -euo pipefail
+        umask 077
+        target_args=()
+        if [[ -n "$DOCKER_TARGET" ]]; then target_args+=(--target "$DOCKER_TARGET"); fi
+        repository_root="$(pwd -P)"
+        build_context="$(realpath "$BUILD_CONTEXT")"
+        dockerfile="$(realpath "$DOCKERFILE_PATH")"
+        [[ -d $build_context && -f $dockerfile ]] || { echo 'Build context must be a directory and Dockerfile must be a file.' >&2; exit 2; }
+        for path in "$build_context" "$dockerfile"; do
+          [[ $path == "$repository_root" || $path == "$repository_root/"* ]] || { echo 'Build paths must resolve inside the checked-out repository.' >&2; exit 2; }
+        done
+        build_args=()
+        args_file=$(mktemp)
+        if ! python3 -c 'import base64,json,sys; args=json.loads(base64.b64decode("e30=")); [sys.stdout.buffer.write(("--build-arg"+chr(0)+key+"="+value+chr(0)).encode()) for key,value in args.items()]' > "$args_file"; then rm -f "$args_file"; exit 2; fi
+        while IFS= read -r -d '' argument; do build_args+=("$argument"); done < "$args_file"
+        rm -f "$args_file"
+        while IFS= read -r line; do
+          [[ -z ${line//[[:space:]]/} || $line =~ ^[[:space:]]*'#' ]] && continue
+          name=${line%%=*}
+          [[ $name =~ ^[A-Za-z_][A-Za-z0-9_]*$ && $line == *=* ]] || exit 2
+          export "LAUNCHDECK_BUILD_$name=${line#*=}"
+          build_args+=(--secret "id=$name,env=LAUNCHDECK_BUILD_$name")
+        done <<< "${BUILD_SECRETS:-}"
+        if [[ -n '' ]]; then
+          export DOCKER_CONFIG="${WORKSPACE_TMP:-/tmp}/launchdeck-auth-${BUILD_NUMBER:-0}"
+          mkdir -p "$DOCKER_CONFIG"
+          trap 'rm -rf "$DOCKER_CONFIG"' EXIT
+          printf '%s' "$REGISTRY_PASSWORD" | docker login '' --username "$REGISTRY_USER" --password-stdin
+        fi
+        builder_arch=$(docker info --format '{{.Architecture}}')
+        if [[ 'linux/amd64' == linux/amd64 && $builder_arch != x86_64 && $builder_arch != amd64 ]] || [[ 'linux/amd64' == linux/arm64 && $builder_arch != aarch64 && $builder_arch != arm64 ]]; then
+          echo 'Build agent architecture does not match project target.' >&2; exit 2
+        fi
+        docker build --platform linux/amd64 "${target_args[@]}" "${build_args[@]}" --file "$dockerfile" -t "$IMAGE_REF" "$build_context"
+        if [[ -n '' ]]; then
+          docker tag "$IMAGE_REF" '//launchdeck-1af5c32a-e0ff-47e3-8dc8-0a455f995a24':"$DEPLOY_SHA"
+          docker push '//launchdeck-1af5c32a-e0ff-47e3-8dc8-0a455f995a24':"$DEPLOY_SHA"
+        fi
+      ''' } }
+    }
+    stage('Package Compose source') {
+      when { expression { env.OPERATION == 'deploy' && !params.ROLLBACK_SHA && env.DEPLOYMENT_MODE == 'compose' } }
       steps {
         sh '''#!/usr/bin/env bash
           set -euo pipefail
-          if [[ -f package-lock.json ]]; then
-            npm ci
-            npm run lint --if-present
-            npm run typecheck --if-present
-            if node -e 'process.exit((require("./package.json").scripts || {})["test:ci"] ? 0 : 1)'; then
-              npm run test:ci
-            else
-              CI=true npm run test --if-present
-            fi
-          fi
+          archive="$WORKSPACE/.launchdeck-compose-source.tar.gz"
+          git archive --format=tar.gz --output="$archive" HEAD -- . \\
+            ':(exclude).launchdeck/**' ':(exclude)**/.launchdeck/**' \\
+            ':(exclude).env' ':(exclude)**/.env' \\
+            ':(exclude).env.*' ':(exclude)**/.env.*' \\
+            ':(exclude).launchdeck-images.yaml' ':(exclude)**/.launchdeck-images.yaml' \\
+            ':(exclude)node_modules/**' ':(exclude)**/node_modules/**'
+          test -s "$archive"
         '''
       }
     }
-    stage('Build image') {
-      when { expression { !params.ROLLBACK_SHA } }
-      steps { sh 'docker build --platform linux/amd64 -t "$IMAGE_REF" .' }
+    stage('Build Compose release') {
+      when { expression { env.OPERATION == 'deploy' && !params.ROLLBACK_SHA && env.DEPLOYMENT_MODE == 'compose' } }
+      steps { withCredentials([string(credentialsId: 'launchdeck-1af5c32a-e0ff-47e3-8dc8-0a455f995a24-runtime-env', variable: 'RUNTIME_ENV'), string(credentialsId: 'launchdeck-1af5c32a-e0ff-47e3-8dc8-0a455f995a24-build-secrets', variable: 'BUILD_SECRETS'), usernamePassword(credentialsId: 'launchdeck-1af5c32a-e0ff-47e3-8dc8-0a455f995a24-registry', usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASSWORD')]) {
+        sh 'python3 .launchdeck/1af5c32a-e0ff-47e3-8dc8-0a455f995a24/artifact-build.py'
+      } }
     }
     stage('Prepare EC2') {
+      when { expression { env.OPERATION == 'deploy' } }
       steps {
-        withCredentials([sshUserPrivateKey(credentialsId: 'launchdeck-1af5c32a-e0ff-47e3-8dc8-0a455f995a24-ssh', keyFileVariable: 'SSH_KEY'), string(credentialsId: 'launchdeck-1af5c32a-e0ff-47e3-8dc8-0a455f995a24-known-hosts', variable: 'KNOWN_HOSTS')]) {
+        withCredentials([sshUserPrivateKey(credentialsId: 'launchdeck-1af5c32a-e0ff-47e3-8dc8-0a455f995a24-ssh', keyFileVariable: 'SSH_KEY'), string(credentialsId: 'launchdeck-1af5c32a-e0ff-47e3-8dc8-0a455f995a24-known-hosts', variable: 'KNOWN_HOSTS'), string(credentialsId: 'launchdeck-1af5c32a-e0ff-47e3-8dc8-0a455f995a24-runtime-env', variable: 'RUNTIME_ENV')]) {
           sh '''#!/usr/bin/env bash
             set -euo pipefail
             umask 077
@@ -54,13 +107,33 @@ pipeline {
             SSH_OPTS="-i $SSH_KEY -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$WORKSPACE/.launchdeck-ssh/known_hosts -o ConnectTimeout=20"
             STAGING="${BUILD_NUMBER}-${BUILD_NUMBER}"
             ssh $SSH_OPTS -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "mkdir -p $DEPLOY_DIR/.incoming-$STAGING"
-            scp $SSH_OPTS -P "$SSH_PORT" .launchdeck/1af5c32a-e0ff-47e3-8dc8-0a455f995a24/bootstrap.sh .launchdeck/1af5c32a-e0ff-47e3-8dc8-0a455f995a24/compose.yaml .launchdeck/1af5c32a-e0ff-47e3-8dc8-0a455f995a24/deploy.sh "$SSH_USER@$SSH_HOST:$DEPLOY_DIR/.incoming-$STAGING/"
+            scp $SSH_OPTS -P "$SSH_PORT" .launchdeck/1af5c32a-e0ff-47e3-8dc8-0a455f995a24/bootstrap.sh .launchdeck/1af5c32a-e0ff-47e3-8dc8-0a455f995a24/compose.yaml .launchdeck/1af5c32a-e0ff-47e3-8dc8-0a455f995a24/deploy.sh .launchdeck/1af5c32a-e0ff-47e3-8dc8-0a455f995a24/readiness.py "$SSH_USER@$SSH_HOST:$DEPLOY_DIR/.incoming-$STAGING/"
             ssh $SSH_OPTS -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "bash $DEPLOY_DIR/.incoming-$STAGING/bootstrap.sh"
+            if [[ "$RUNTIME_ENV" != '__LAUNCHDECK_UNMANAGED_RUNTIME_ENV__' ]]; then
+              printf '%s' "$RUNTIME_ENV" | ssh $SSH_OPTS -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "umask 077; cat > $DEPLOY_DIR/.env.production.incoming-$STAGING && chmod 600 $DEPLOY_DIR/.env.production.incoming-$STAGING && mv $DEPLOY_DIR/.env.production.incoming-$STAGING $DEPLOY_DIR/.env.production"
+            fi
+          '''
+        }
+      }
+    }
+    stage('Database operation') {
+      when { expression { env.OPERATION != 'deploy' } }
+      steps {
+        withCredentials([sshUserPrivateKey(credentialsId: 'launchdeck-1af5c32a-e0ff-47e3-8dc8-0a455f995a24-ssh', keyFileVariable: 'SSH_KEY'), string(credentialsId: 'launchdeck-1af5c32a-e0ff-47e3-8dc8-0a455f995a24-known-hosts', variable: 'KNOWN_HOSTS')]) {
+          sh '''#!/usr/bin/env bash
+            set -euo pipefail
+            umask 077
+            mkdir -p "$WORKSPACE/.launchdeck-ssh"
+            printf '%s\\n' "$KNOWN_HOSTS" > "$WORKSPACE/.launchdeck-ssh/known_hosts"
+            SSH_OPTS="-i $SSH_KEY -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$WORKSPACE/.launchdeck-ssh/known_hosts -o ConnectTimeout=20"
+            scp $SSH_OPTS -P "$SSH_PORT" .launchdeck/1af5c32a-e0ff-47e3-8dc8-0a455f995a24/operations.sh "$SSH_USER@$SSH_HOST:$DEPLOY_DIR/operations.sh"
+            ssh $SSH_OPTS -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "bash $DEPLOY_DIR/operations.sh '$OPERATION' '${BACKUP_ID:-}' '${CONFIRM_RESTORE:-false}'"
           '''
         }
       }
     }
     stage('Transfer image and deploy') {
+      when { expression { env.OPERATION == 'deploy' } }
       steps {
         withCredentials([sshUserPrivateKey(credentialsId: 'launchdeck-1af5c32a-e0ff-47e3-8dc8-0a455f995a24-ssh', keyFileVariable: 'SSH_KEY'), string(credentialsId: 'launchdeck-1af5c32a-e0ff-47e3-8dc8-0a455f995a24-known-hosts', variable: 'KNOWN_HOSTS')]) {
           sh '''#!/usr/bin/env bash
@@ -68,8 +141,12 @@ pipeline {
             printf '%s\\n' "$KNOWN_HOSTS" > "$WORKSPACE/.launchdeck-ssh/known_hosts"
             SSH_OPTS="-i $SSH_KEY -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$WORKSPACE/.launchdeck-ssh/known_hosts -o ConnectTimeout=20"
             STAGING="${BUILD_NUMBER}-${BUILD_NUMBER}"
-            if [[ -z "${ROLLBACK_SHA:-}" ]]; then
+            if [[ -z "${ROLLBACK_SHA:-}" && "$DEPLOYMENT_MODE" == dockerfile ]]; then
               docker save "$IMAGE_REF" | ssh $SSH_OPTS -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" 'docker load'
+            fi
+            if [[ -z "${ROLLBACK_SHA:-}" && "$DEPLOYMENT_MODE" == compose ]]; then
+              ssh $SSH_OPTS -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" 'docker load' < "$WORKSPACE/.launchdeck-images.tar"
+              scp $SSH_OPTS -P "$SSH_PORT" "$WORKSPACE/.launchdeck-compose-source.tar.gz" "$SSH_USER@$SSH_HOST:$DEPLOY_DIR/.incoming-$STAGING/source.tar.gz"
             fi
             ssh $SSH_OPTS -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "bash $DEPLOY_DIR/.incoming-$STAGING/deploy.sh '$DEPLOY_SHA' '$STAGING'"
           '''
@@ -77,5 +154,5 @@ pipeline {
       }
     }
   }
-  post { always { sh 'rm -rf "$WORKSPACE/.launchdeck-ssh"' } }
+  post { always { sh 'rm -rf "$WORKSPACE/.launchdeck-ssh"; rm -f "$WORKSPACE/.launchdeck-images.tar" "$WORKSPACE/.launchdeck-compose-source.tar.gz"' } }
 }
