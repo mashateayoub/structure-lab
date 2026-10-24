@@ -36,7 +36,7 @@ pipeline {
         set -euo pipefail
         umask 077
         target_args=()
-        if [[ -n "$DOCKER_TARGET" ]]; then target_args+=(--target "$DOCKER_TARGET"); fi
+        if [[ -n "${DOCKER_TARGET:-}" ]]; then target_args+=(--target "$DOCKER_TARGET"); fi
         repository_root="$(pwd -P)"
         build_context="$(realpath "$BUILD_CONTEXT")"
         dockerfile="$(realpath "$DOCKERFILE_PATH")"
