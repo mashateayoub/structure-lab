@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 test("all lessons render and quizzes work", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.goto("/");
+  await page.goto("/#1");
   for (let i = 0; i < 17; i++) {
     await expect(page.locator("h1")).toBeVisible();
     await expect(
@@ -15,7 +15,7 @@ test("all lessons render and quizzes work", async ({ page }) => {
   expect(errors).toEqual([]);
 });
 test("array mutation and stack underflow", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/#1");
   await page.getByRole("button", { name: "Push", exact: true }).click();
   await expect(page.locator(".cell").last()).toHaveText("42");
   await page.getByRole("button", { name: "Stacks", exact: true }).click();
@@ -79,7 +79,7 @@ test("mobile navigation, quiz persistence, and no horizontal overflow", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/");
+  await page.goto("/#1");
   await page.getByRole("button", { name: "C Unshift at the front" }).click();
   await page.reload();
   await expect(page.locator(".feedback")).toContainText("Correct.");
@@ -139,7 +139,7 @@ test("tree insertion, graph edge editing and growth controls", async ({
 });
 test("capture desktop and mobile presentation", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.goto("/");
+  await page.goto("/#1");
   await expect(page.locator(".cell").first()).toBeVisible();
   await page.screenshot({ path: "test-results/desktop.png", fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });

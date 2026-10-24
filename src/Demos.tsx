@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import i18n, { tr } from "./i18n";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ReactFlow,
@@ -8,8 +9,10 @@ import {
   addEdge,
   useEdgesState,
   useNodesState,
+  ConnectionMode,
+  type ReactFlowInstance,
 } from "@xyflow/react";
-import type { Connection, Node } from "@xyflow/react";
+import type { Connection, Node, Edge } from "@xyflow/react";
 import {
   buildBST,
   parseNumbers,
@@ -19,6 +22,8 @@ import {
   treeLayout,
 } from "./engine";
 import type { Frame } from "./engine";
+import { arrangeGraph, connectionSides } from "./diagramLayout";
+import { diagramNodeTypes } from "./DiagramNode";
 
 export function Cells({
   values,
@@ -32,36 +37,48 @@ export function Cells({
   linked?: boolean;
 }) {
   return (
-    <div className="cells" role="list" aria-label="Current values">
+    <div
+      className={linked ? "cells linked-cells" : "cells"}
+      role="list"
+      aria-label={tr("Current values")}
+    >
       <AnimatePresence initial={false}>
-        {values.map((value, i) => (
-          <motion.div
-            layout
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            className="cell-group"
-            key={`${i}-${value}`}
-            role="listitem"
-          >
-            <div
-              className={`cell ${active.includes(i) ? "active" : ""} ${done.includes(i) ? "done" : ""}`}
+        {tr(
+          values.map((value, i) => (
+            <motion.div
+              layout
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              className="cell-group"
+              key={`${i}-${value}`}
+              role="listitem"
             >
-              {value}
-            </div>
-            <small>
-              {linked ? (i === 0 ? "head" : `node ${i}`) : `[${i}]`}
-            </small>
-            {linked && (
-              <span className="link-arrow">
-                {i === values.length - 1 ? "→ ∅" : "→"}
-              </span>
-            )}
-          </motion.div>
-        ))}
+              <div
+                className={`cell ${active.includes(i) ? "active" : ""} ${done.includes(i) ? "done" : ""}`}
+              >
+                {tr(value)}
+              </div>
+              <small>
+                {tr(linked ? (i === 0 ? "head" : `node ${i}`) : `[${i}]`)}
+              </small>
+              {tr(
+                linked && (
+                  <span className="link-arrow">
+                    {tr(i === values.length - 1 ? "→ ∅" : "→")}
+                  </span>
+                ),
+              )}
+            </motion.div>
+          )),
+        )}
       </AnimatePresence>
-      {!values.length && (
-        <p className="empty">Empty collection. Add a value to begin.</p>
+      {tr(
+        !values.length && (
+          <p className="empty">
+            {tr("Empty collection. Add a value to begin.")}
+          </p>
+        ),
       )}
     </div>
   );
@@ -215,41 +232,47 @@ export function Collection({ name }: { name: string }) {
     <>
       <div className="demo-toolbar">
         <label>
-          {keyed ? "Value" : "Number"}
+          {tr(keyed ? "Value" : "Number")}
           <input
-            aria-label="Value"
+            aria-label={tr("Value")}
             value={value}
             onChange={(e) => setValue(e.target.value)}
             maxLength={60}
           />
         </label>
-        {keyed && (
-          <label>
-            Key
-            <input
-              value={key}
-              onChange={(e) => setKey(e.target.value)}
-              maxLength={40}
-            />
-          </label>
+        {tr(
+          keyed && (
+            <label>
+              {tr("Key")}
+              <input
+                value={key}
+                onChange={(e) => setKey(e.target.value)}
+                maxLength={40}
+              />
+            </label>
+          ),
         )}
-        {name === "Arrays" && (
-          <label>
-            Index
-            <input
-              value={index}
-              onChange={(e) => setIndex(e.target.value)}
-              type="number"
-              min="0"
-              max="16"
-            />
-          </label>
+        {tr(
+          name === "Arrays" && (
+            <label>
+              {tr("Index")}
+              <input
+                value={index}
+                onChange={(e) => setIndex(e.target.value)}
+                type="number"
+                min="0"
+                max="16"
+              />
+            </label>
+          ),
         )}
-        {actions.map((a) => (
-          <button key={a} onClick={() => act(a)}>
-            {a}
-          </button>
-        ))}
+        {tr(
+          actions.map((a) => (
+            <button key={a} onClick={() => act(a)}>
+              {tr(a)}
+            </button>
+          )),
+        )}
         <button
           className="quiet"
           onClick={() => {
@@ -259,42 +282,50 @@ export function Collection({ name }: { name: string }) {
             setMessage("Collection cleared.");
           }}
         >
-          Clear
+          {tr("Clear")}
         </button>
       </div>
       <div className="collection-stage">
-        {keyed ? (
-          <div className="entries">
-            {entries.length ? (
-              entries.map(([k, v]) => (
-                <motion.div layout className="entry" key={k}>
-                  <code>{k}</code>
-                  <span>→</span>
-                  <strong>{v}</strong>
-                </motion.div>
-              ))
-            ) : (
-              <p>Empty collection.</p>
-            )}
-          </div>
-        ) : (
-          <>
-            <Cells values={values} active={active} linked={linked} />
-            {name === "Stacks" && (
-              <p className="annotation">
-                BOTTOM ← &nbsp; {values.length} items &nbsp; → TOP
-              </p>
-            )}
-            {name === "Queues" && (
-              <p className="annotation">
-                FRONT ← &nbsp; {values.length} items &nbsp; ← BACK
-              </p>
-            )}
-          </>
+        {tr(
+          keyed ? (
+            <div className="entries">
+              {tr(
+                entries.length ? (
+                  entries.map(([k, v]) => (
+                    <motion.div layout className="entry" key={k}>
+                      <code>{tr(k)}</code>
+                      <span>{tr("→")}</span>
+                      <strong>{tr(v)}</strong>
+                    </motion.div>
+                  ))
+                ) : (
+                  <p>{tr("Empty collection.")}</p>
+                ),
+              )}
+            </div>
+          ) : (
+            <>
+              <Cells values={values} active={active} linked={linked} />
+              {tr(
+                name === "Stacks" && (
+                  <p className="annotation">
+                    {i18n.t("BOTTOM ← {{n}} items → TOP", { n: values.length })}
+                  </p>
+                ),
+              )}
+              {tr(
+                name === "Queues" && (
+                  <p className="annotation">
+                    {i18n.t("FRONT ← {{n}} items ← BACK", { n: values.length })}
+                  </p>
+                ),
+              )}
+            </>
+          ),
         )}
       </div>
       <p className="status" role="status">
-        {message}
+        {tr(message)}
       </p>
     </>
   );
@@ -331,13 +362,13 @@ function PlaybackControls({ p, count }: { p: Playback; count: number }) {
   return (
     <div className="playback">
       <button
-        aria-label="Restart animation"
+        aria-label={tr("Restart animation")}
         onClick={() => {
           p.setStep(0);
           p.setPlaying(false);
         }}
       >
-        ↺ Restart
+        {tr("↺ Restart")}
       </button>
       <button
         disabled={p.step === 0}
@@ -346,7 +377,7 @@ function PlaybackControls({ p, count }: { p: Playback; count: number }) {
           p.setStep((s) => s - 1);
         }}
       >
-        Back
+        {tr("Back")}
       </button>
       <button
         className="primary"
@@ -356,7 +387,7 @@ function PlaybackControls({ p, count }: { p: Playback; count: number }) {
           p.setPlaying(!p.playing);
         }}
       >
-        {p.playing ? "Pause" : "Play"}
+        {tr(p.playing ? "Pause" : "Play")}
       </button>
       <button
         disabled={p.step >= count - 1}
@@ -365,21 +396,23 @@ function PlaybackControls({ p, count }: { p: Playback; count: number }) {
           p.setStep((s) => s + 1);
         }}
       >
-        Step
+        {tr("Step")}
       </button>
       <span className="step-count">
-        {Math.min(p.step + 1, count)} / {count}
+        {tr(Math.min(p.step + 1, count))}
+        {tr("/")}
+        {tr(count)}
       </span>
       <label>
-        Step delay
+        {tr("Step delay")}
         <select
-          aria-label="Step delay"
+          aria-label={tr("Step delay")}
           value={p.speed}
           onChange={(e) => p.setSpeed(Number(e.target.value))}
         >
-          <option value="1200">Slow</option>
-          <option value="650">Normal</option>
-          <option value="200">Fast</option>
+          <option value="1200">{tr("Slow")}</option>
+          <option value="650">{tr("Normal")}</option>
+          <option value="200">{tr("Fast")}</option>
         </select>
       </label>
     </div>
@@ -404,29 +437,31 @@ export function Algorithm({ sort = false }: { sort?: boolean }) {
     <>
       <div className="demo-toolbar">
         <label className="grow">
-          Values (comma-separated)
+          {tr("Values (comma-separated)")}
           <input value={input} onChange={(e) => setInput(e.target.value)} />
         </label>
-        {!sort && (
-          <label>
-            Target
-            <input
-              type="number"
-              value={target}
-              onChange={(e) => setTarget(e.target.value)}
-            />
-          </label>
+        {tr(
+          !sort && (
+            <label>
+              {tr("Target")}
+              <input
+                type="number"
+                value={target}
+                onChange={(e) => setTarget(e.target.value)}
+              />
+            </label>
+          ),
         )}
         <label>
-          Algorithm
+          {tr("Algorithm")}
           <select
-            aria-label="Algorithm"
+            aria-label={tr("Algorithm")}
             value={mode}
             onChange={(e) => setMode(e.target.value)}
           >
-            {(sort ? ["Bubble", "Insertion"] : ["Linear", "Binary"]).map(
-              (v) => (
-                <option key={v}>{v}</option>
+            {tr(
+              (sort ? ["Bubble", "Insertion"] : ["Linear", "Binary"]).map(
+                (v) => <option key={v}>{tr(v)}</option>,
               ),
             )}
           </select>
@@ -445,13 +480,15 @@ export function Algorithm({ sort = false }: { sort?: boolean }) {
             }
           }}
         >
-          Apply data
+          {tr("Apply data")}
         </button>
       </div>
-      {error && (
-        <p role="alert" className="error">
-          {error}
-        </p>
+      {tr(
+        error && (
+          <p role="alert" className="error">
+            {tr(error)}
+          </p>
+        ),
       )}
       <div className="algorithm-stage">
         <Cells
@@ -460,41 +497,40 @@ export function Algorithm({ sort = false }: { sort?: boolean }) {
           done={p.frame?.done}
         />
         <div className="bars" aria-hidden="true">
-          {p.frame?.values.map((v, i) => (
-            <motion.div
-              key={i}
-              animate={{
-                height: Math.max(
-                  8,
-                  (Math.abs(v) / Math.max(1, ...values.map(Math.abs))) * 100,
-                ),
-              }}
-              className={p.frame.active.includes(i) ? "highlight" : ""}
-            >
-              <span>{v}</span>
-            </motion.div>
-          ))}
+          {tr(
+            p.frame?.values.map((v, i) => (
+              <motion.div
+                key={i}
+                animate={{
+                  height: Math.max(
+                    8,
+                    (Math.abs(v) / Math.max(1, ...values.map(Math.abs))) * 100,
+                  ),
+                }}
+                className={p.frame.active.includes(i) ? "highlight" : ""}
+              >
+                <span>{tr(v)}</span>
+              </motion.div>
+            )),
+          )}
         </div>
       </div>
       <p className="status" role="status">
-        {p.frame?.message}
+        {tr(p.frame?.message)}
       </p>
       <PlaybackControls p={p} count={frames.length} />
       <p className="fine-print">
-        Amber = current comparison · green = confirmed result. Bar heights show
-        absolute magnitude; labels retain sign. Trace snapshots use extra memory
-        for teaching.
+        {tr(
+          "Amber = current comparison · green = confirmed result. Bar heights show absolute magnitude; labels retain sign. Trace snapshots use extra memory for teaching.",
+        )}
       </p>
     </>
   );
 }
-const initialNodes: Node[] = ["A", "B", "C", "D", "E", "F"].map((id, i) => ({
+const graphSeed: Node[] = ["A", "B", "C", "D", "E", "F"].map((id) => ({
   id,
   data: { label: id },
-  position: {
-    x: [220, 60, 380, 0, 160, 380][i],
-    y: [0, 120, 120, 240, 240, 240][i],
-  },
+  position: { x: 0, y: 0 },
 }));
 const initialEdges = [
   ["A", "B"],
@@ -508,14 +544,17 @@ const initialEdges = [
   target,
   markerEnd: { type: MarkerType.ArrowClosed },
 }));
+const initialNodes = arrangeGraph(graphSeed, initialEdges);
 export function GraphDemo({ name }: { name: string }) {
   const tree = name === "Trees / BST";
+  const flow = useRef<Pick<ReactFlowInstance, "fitView"> | null>(null);
+  const diagramContainer = useRef<HTMLDivElement | null>(null);
   const [treeValues, setTreeValues] = useState([40, 20, 60, 10, 30, 50, 70]),
     [input, setInput] = useState("25"),
     [message, setMessage] = useState(""),
     [start, setStart] = useState("A");
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes),
-    [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+    [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initialEdges);
   const layout = useMemo(() => treeLayout(buildBST(treeValues)), [treeValues]);
   // React Flow also updates nodes for measurement, selection and dragging.
   // Only topology changes should invalidate an in-progress traversal.
@@ -532,29 +571,49 @@ export function GraphDemo({ name }: { name: string }) {
   }, [topology, start, name]);
   const p = usePlayback(frames);
   const walk = name === "BFS" || name === "DFS";
-  const visibleNodes = tree
-    ? layout.nodes
-    : nodes.map((n) => ({
-        ...n,
-        style: {
-          background:
-            walk && p.frame?.visited?.includes(n.id) ? "#b9e8cf" : "#fff",
-          border:
-            walk && p.frame?.frontier?.includes(n.id)
-              ? "2px solid #c58926"
-              : "1px solid #bccdc8",
-          borderRadius: 14,
-          color: "#152a29",
-          fontWeight: 700,
-        },
-      }));
-  const visibleEdges = tree
-    ? layout.edges.map((e, i) => ({
-        ...e,
-        id: String(i),
-        markerEnd: { type: MarkerType.ArrowClosed },
-      }))
-    : edges;
+  const visibleNodes: Node[] = (tree ? layout.nodes : nodes).map((n) => ({
+    ...n,
+    type: "readable",
+    className: "diagram-node structure-node",
+    style: {
+      width: 80,
+      height: 54,
+      background:
+        walk && p.frame?.visited?.includes(n.id) ? "#294d3a" : "#193038",
+      border:
+        walk && p.frame?.frontier?.includes(n.id)
+          ? "2px solid #d7b477"
+          : "1px solid #70958b",
+      color: "#edf5eb",
+    },
+  }));
+  const visibleEdges = (
+    tree ? layout.edges.map((e, i) => ({ ...e, id: String(i) })) : edges
+  ).map((e) => {
+    const source = visibleNodes.find((n) => n.id === e.source),
+      target = visibleNodes.find((n) => n.id === e.target);
+    const [from, to] =
+      source && target
+        ? connectionSides(source.position, target.position)
+        : ["bottom", "top"];
+    return {
+      ...e,
+      type: "smoothstep",
+      sourceHandle: from,
+      targetHandle: to,
+      markerEnd: { type: MarkerType.ArrowClosed, color: "#91b4a5" },
+      style: { stroke: "#91b4a5", strokeWidth: 1.8 },
+      pathOptions: { borderRadius: 10, offset: 28 },
+    };
+  });
+  const diagramWidth = Math.max(
+    560,
+    ...visibleNodes.map((n) => n.position.x + 150),
+  );
+  const diagramHeight = Math.max(
+    440,
+    ...visibleNodes.map((n) => n.position.y + 140),
+  );
   const connect = (connection: Connection) => {
     if (connection.source === connection.target) {
       setMessage("This demo skips self-loops.");
@@ -570,197 +629,276 @@ export function GraphDemo({ name }: { name: string }) {
   return (
     <>
       <div className="demo-toolbar">
-        {tree ? (
-          <>
-            <label>
-              Insert value
-              <input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                type="number"
-              />
-            </label>
-            <button
-              onClick={() => {
-                try {
-                  const vals = parseNumbers(input);
-                  if (vals.length !== 1) throw new Error("Enter one value.");
-                  if (treeValues.length >= 16)
-                    throw new Error("Maximum 16 tree nodes.");
-                  if (treeValues.includes(vals[0]))
-                    setMessage(
-                      "Duplicate ignored: BST values are unique here.",
-                    );
-                  else {
-                    setTreeValues([...treeValues, ...vals]);
-                    setMessage(
-                      `Inserted ${vals[0]}. Follow smaller-left, larger-right comparisons from the root.`,
-                    );
+        {tr(
+          tree ? (
+            <>
+              <label>
+                {tr("Insert value")}
+                <input
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  type="number"
+                />
+              </label>
+              <button
+                onClick={() => {
+                  try {
+                    const vals = parseNumbers(input);
+                    if (vals.length !== 1) throw new Error("Enter one value.");
+                    if (treeValues.length >= 16)
+                      throw new Error("Maximum 16 tree nodes.");
+                    if (treeValues.includes(vals[0]))
+                      setMessage(
+                        "Duplicate ignored: BST values are unique here.",
+                      );
+                    else {
+                      setTreeValues([...treeValues, ...vals]);
+                      setMessage(
+                        `Inserted ${vals[0]}. Follow smaller-left, larger-right comparisons from the root.`,
+                      );
+                    }
+                  } catch (e) {
+                    setMessage((e as Error).message);
                   }
-                } catch (e) {
-                  setMessage((e as Error).message);
-                }
-              }}
-            >
-              Insert node
-            </button>
-            <button
-              onClick={() => {
-                setTreeValues([]);
-                setMessage("Empty tree. Insert a root.");
-              }}
-            >
-              Clear tree
-            </button>
-            <button
-              onClick={() => {
-                setTreeValues([40, 20, 60, 10, 30, 50, 70]);
-                setMessage("Tree reset.");
-              }}
-            >
-              Reset tree
-            </button>
-          </>
-        ) : (
-          <>
-            <label>
-              Start vertex
-              <select
-                aria-label="Start vertex"
-                value={start}
-                onChange={(e) => setStart(e.target.value)}
+                }}
               >
-                {nodes.map((n) => (
-                  <option key={n.id}>{n.id}</option>
-                ))}
-              </select>
-            </label>
-            <button
-              disabled={nodes.length >= 12}
-              onClick={() => {
-                const id = String.fromCharCode(65 + nodes.length);
-                setNodes((ns) => [
-                  ...ns,
-                  {
-                    id,
-                    data: { label: id },
-                    position: {
-                      x: 80 * (ns.length % 5),
-                      y: 350 + Math.floor(ns.length / 5) * 90,
-                    },
-                  },
-                ]);
-                setMessage(
-                  `Added ${id}. Connect a bottom handle to another node’s top handle.`,
-                );
-              }}
-            >
-              Add vertex
-            </button>
-            <button
-              onClick={() => {
-                setEdges([]);
-                setMessage("Edges cleared. Connect nodes using their handles.");
-              }}
-            >
-              Clear edges
-            </button>
-            <button
-              onClick={() => {
-                setNodes(initialNodes);
-                setEdges(initialEdges);
-                setStart("A");
-                setMessage("Graph reset.");
-              }}
-            >
-              Reset graph
-            </button>
-          </>
+                {tr("Insert node")}
+              </button>
+              <button
+                onClick={() => {
+                  setTreeValues([]);
+                  setMessage("Empty tree. Insert a root.");
+                }}
+              >
+                {tr("Clear tree")}
+              </button>
+              <button
+                onClick={() => {
+                  setTreeValues([40, 20, 60, 10, 30, 50, 70]);
+                  setMessage("Tree reset.");
+                }}
+              >
+                {tr("Reset tree")}
+              </button>
+            </>
+          ) : (
+            <>
+              <label>
+                {tr("Start vertex")}
+                <select
+                  aria-label={tr("Start vertex")}
+                  value={start}
+                  onChange={(e) => setStart(e.target.value)}
+                >
+                  {tr(nodes.map((n) => <option key={n.id}>{tr(n.id)}</option>))}
+                </select>
+              </label>
+              <button
+                disabled={nodes.length >= 12}
+                onClick={() => {
+                  const id = String.fromCharCode(65 + nodes.length);
+                  setNodes((ns) =>
+                    arrangeGraph(
+                      [
+                        ...ns,
+                        {
+                          id,
+                          data: { label: id },
+                          position: {
+                            x: 80 * (ns.length % 5),
+                            y: 350 + Math.floor(ns.length / 5) * 90,
+                          },
+                        },
+                      ],
+                      edges,
+                    ),
+                  );
+                  setMessage(
+                    `Added ${id}. Connect a bottom handle to another node’s top handle.`,
+                  );
+                }}
+              >
+                {tr("Add vertex")}
+              </button>
+              <button
+                onClick={() => {
+                  setEdges([]);
+                  setMessage(
+                    "Edges cleared. Connect nodes using their handles.",
+                  );
+                }}
+              >
+                {tr("Clear edges")}
+              </button>
+              <button
+                onClick={() => {
+                  setNodes(initialNodes);
+                  setEdges(initialEdges);
+                  setStart("A");
+                  setMessage("Graph reset.");
+                }}
+              >
+                {tr("Reset graph")}
+              </button>
+            </>
+          ),
         )}
       </div>
-      <div
-        className="flow-stage"
-        aria-label={
-          tree ? "Binary search tree diagram" : "Directed graph diagram"
-        }
-      >
-        <ReactFlow
-          key={tree ? treeValues.join(",") : "graph"}
-          nodes={visibleNodes}
-          edges={visibleEdges}
-          onNodesChange={tree ? undefined : onNodesChange}
-          onEdgesChange={tree ? undefined : onEdgesChange}
-          onConnect={tree ? undefined : connect}
-          nodesConnectable={!tree}
-          nodesDraggable={!tree}
-          deleteKeyCode={null}
-          fitView
-          minZoom={0.2}
-          maxZoom={2}
+      <div className="diagram-toolbar">
+        <span>{tr("Scroll or zoom to inspect the diagram.")}</span>
+        <button
+          onClick={() => {
+            if (!tree) setNodes((ns) => arrangeGraph(ns, edges));
+            requestAnimationFrame(() =>
+              flow.current?.fitView({
+                padding: 0.18,
+                maxZoom: 1,
+                minZoom: 0.7,
+              }),
+            );
+          }}
         >
-          <Background color="#cbd8d3" gap={22} />
-          <Controls showInteractive={false} />
-        </ReactFlow>
+          {tr("Auto arrange")}
+        </button>
+        <button
+          onClick={() =>
+            flow.current?.fitView({ padding: 0.18, maxZoom: 1, minZoom: 0.7 })
+          }
+        >
+          {tr("Fit diagram")}
+        </button>
       </div>
-      {!tree && (
-        <details className="accessible-graph">
-          <summary>Keyboard-friendly edge editor and text view</summary>
-          <EdgeEditor
-            ids={nodes.map((n) => n.id)}
-            onAdd={(s, t) =>
-              connect({
-                source: s,
-                target: t,
-                sourceHandle: null,
-                targetHandle: null,
-              })
-            }
-          />
-          <p>
-            Vertices: {nodes.map((n) => n.id).join(", ")}. Edges:{" "}
-            {edges.map((e) => `${e.source} → ${e.target}`).join("; ") || "none"}
-            .
-          </p>
-        </details>
+      <div
+        ref={diagramContainer}
+        className="flow-stage arranged-flow"
+        aria-label={tr(
+          tree ? "Binary search tree diagram" : "Directed graph diagram",
+        )}
+      >
+        <div
+          className="diagram-canvas"
+          style={{ minWidth: diagramWidth, height: diagramHeight }}
+        >
+          <ReactFlow<Node>
+            nodeTypes={diagramNodeTypes}
+            connectionMode={ConnectionMode.Loose}
+            onInit={(instance) => {
+              flow.current = instance;
+              requestAnimationFrame(() => {
+                const container = diagramContainer.current;
+                if (container)
+                  container.scrollLeft =
+                    (container.scrollWidth - container.clientWidth) / 2;
+              });
+            }}
+            fitViewOptions={{ padding: 0.18, maxZoom: 1, minZoom: 0.7 }}
+            colorMode="dark"
+            key={tree ? treeValues.join(",") : "graph"}
+            nodes={visibleNodes}
+            edges={visibleEdges}
+            onNodesChange={tree ? undefined : onNodesChange}
+            onEdgesChange={tree ? undefined : onEdgesChange}
+            onConnect={tree ? undefined : connect}
+            nodesConnectable={!tree}
+            nodesDraggable={!tree}
+            deleteKeyCode={null}
+            fitView
+            minZoom={0.2}
+            maxZoom={2}
+            ariaLabelConfig={{
+              "controls.zoomIn.ariaLabel": tr("Zoom in"),
+              "controls.zoomOut.ariaLabel": tr("Zoom out"),
+              "controls.fitView.ariaLabel": tr("Fit view"),
+            }}
+          >
+            <Background color="#385149" gap={24} />
+            <Controls showInteractive={false} />
+          </ReactFlow>
+        </div>
+      </div>
+      {tr(
+        !tree && (
+          <details className="accessible-graph">
+            <summary>
+              {tr("Keyboard-friendly edge editor and text view")}
+            </summary>
+            <EdgeEditor
+              ids={nodes.map((n) => n.id)}
+              onAdd={(s, t) =>
+                connect({
+                  source: s,
+                  target: t,
+                  sourceHandle: null,
+                  targetHandle: null,
+                })
+              }
+            />
+            <p>
+              {tr("Vertices:")}
+              {tr(nodes.map((n) => n.id).join(", "))}
+              {tr(". Edges:")}
+              {tr(" ")}
+              {tr(
+                edges.map((e) => `${e.source} → ${e.target}`).join("; ") ||
+                  "none",
+              )}
+              {tr(".")}
+            </p>
+          </details>
+        ),
       )}
-      {tree && (
-        <p className="fine-print">
-          Text view:{" "}
-          {layout.edges.map((e) => `${e.source} → ${e.target}`).join("; ") ||
-            "No child edges."}{" "}
-          Inorder: {[...treeValues].sort((a, b) => a - b).join(", ") || "empty"}
-          .
-        </p>
-      )}
-      {walk ? (
-        <>
-          <p className="status" role="status">
-            {p.frame?.message}
-          </p>
-          <div className="traversal-state">
-            <span>
-              Visited:{" "}
-              <strong>{p.frame?.visited?.join(" → ") || "none"}</strong>
-            </span>
-            <span>
-              {name === "DFS" ? "Stack" : "Queue"}:{" "}
-              <strong>{p.frame?.frontier?.join(", ") || "empty"}</strong>
-            </span>
-          </div>
-          <PlaybackControls p={p} count={frames.length} />
+      {tr(
+        tree && (
           <p className="fine-print">
-            *The teaching trace filters the edge list per vertex and copies
-            snapshots. Its overhead differs from the O(V + E) adjacency-list
-            implementation in the playground.
+            {tr("Text view:")}
+            {tr(" ")}
+            {tr(
+              layout.edges.map((e) => `${e.source} → ${e.target}`).join("; ") ||
+                "No child edges.",
+            )}
+            {tr(" ")}
+            {tr("Inorder:")}
+            {tr([...treeValues].sort((a, b) => a - b).join(", ") || "empty")}
+            {tr(".")}
           </p>
-        </>
-      ) : (
-        <p className="status" role="status">
-          {message ||
-            (tree
-              ? "Insert a value to see how the hierarchy changes."
-              : "Drag nodes to arrange the network. Connect handles to add directed edges.")}
-        </p>
+        ),
+      )}
+      {tr(
+        walk ? (
+          <>
+            <p className="status" role="status">
+              {tr(p.frame?.message)}
+            </p>
+            <div className="traversal-state">
+              <span>
+                {tr("Visited:")}
+                {tr(" ")}
+                <strong>{tr(p.frame?.visited?.join(" → ") || "none")}</strong>
+              </span>
+              <span>
+                {tr(name === "DFS" ? "Stack" : "Queue")}
+                {tr(":")}
+                {tr(" ")}
+                <strong>{tr(p.frame?.frontier?.join(", ") || "empty")}</strong>
+              </span>
+            </div>
+            <PlaybackControls p={p} count={frames.length} />
+            <p className="fine-print">
+              {tr(
+                "*The teaching trace filters the edge list per vertex and copies snapshots. Its overhead differs from the O(V + E) adjacency-list implementation in the playground.",
+              )}
+            </p>
+          </>
+        ) : (
+          <p className="status" role="status">
+            {tr(
+              message ||
+                (tree
+                  ? "Insert a value to see how the hierarchy changes."
+                  : "Drag nodes to arrange the network. Connect handles to add directed edges."),
+            )}
+          </p>
+        ),
       )}
     </>
   );
@@ -777,27 +915,23 @@ function EdgeEditor({
   return (
     <div className="demo-toolbar">
       <label>
-        From
+        {tr("From")}
         <select
-          aria-label="From"
+          aria-label={tr("From")}
           value={source}
           onChange={(e) => setSource(e.target.value)}
         >
-          {ids.map((id) => (
-            <option key={id}>{id}</option>
-          ))}
+          {tr(ids.map((id) => <option key={id}>{tr(id)}</option>))}
         </select>
       </label>
       <label>
-        To
+        {tr("To")}
         <select
-          aria-label="To"
+          aria-label={tr("To")}
           value={target}
           onChange={(e) => setTarget(e.target.value)}
         >
-          {ids.map((id) => (
-            <option key={id}>{id}</option>
-          ))}
+          {tr(ids.map((id) => <option key={id}>{tr(id)}</option>))}
         </select>
       </label>
       <button
@@ -808,7 +942,7 @@ function EdgeEditor({
           )
         }
       >
-        Connect vertices
+        {tr("Connect vertices")}
       </button>
     </div>
   );
@@ -833,7 +967,8 @@ export function Complexity({ space = false }: { space?: boolean }) {
     <>
       <div className="demo-toolbar">
         <label className="grow">
-          Input size n = {n}
+          {tr("Input size n =")}
+          {tr(n)}
           <input
             type="range"
             min="2"
@@ -843,51 +978,57 @@ export function Complexity({ space = false }: { space?: boolean }) {
           />
         </label>
         <label>
-          Vertical scale
+          {tr("Vertical scale")}
           <select
-            aria-label="Vertical scale"
+            aria-label={tr("Vertical scale")}
             value={log ? "log" : "linear"}
             onChange={(e) => setLog(e.target.value === "log")}
           >
-            <option value="log">Logarithmic</option>
-            <option value="linear">Linear</option>
+            <option value="log">{tr("Logarithmic")}</option>
+            <option value="linear">{tr("Linear")}</option>
           </select>
         </label>
       </div>
       <svg
         viewBox="0 0 650 270"
         role="img"
-        aria-label="Growth comparison chart. Exact values appear in the table below."
+        aria-label={tr(
+          "Growth comparison chart. Exact values appear in the table below.",
+        )}
         className="chart"
       >
         <path d="M45 15V230H620" fill="none" stroke="#a9bab3" />
-        {[0, 0.25, 0.5, 0.75, 1].map((t) => (
-          <g key={t}>
-            <line
-              x1="45"
-              x2="620"
-              y1={230 - t * 210}
-              y2={230 - t * 210}
-              stroke="#dce5e0"
+        {tr(
+          [0, 0.25, 0.5, 0.75, 1].map((t) => (
+            <g key={t}>
+              <line
+                x1="45"
+                x2="620"
+                y1={230 - t * 210}
+                y2={230 - t * 210}
+                stroke="#dce5e0"
+              />
+              <text x="40" y={234 - t * 210} textAnchor="end" fontSize="10">
+                {tr(Math.round(log ? Math.pow(4097, t) - 1 : t * 4096))}
+              </text>
+            </g>
+          )),
+        )}
+        {tr(
+          curves.map((c) => (
+            <path
+              key={c.name}
+              d={Array.from(
+                { length: 63 },
+                (_, i) =>
+                  `${i ? "L" : "M"}${45 + ((i + 2) / 64) * 570},${230 - scale(c.f(i + 2)) * 210}`,
+              ).join(" ")}
+              fill="none"
+              stroke={c.color}
+              strokeWidth="2.5"
             />
-            <text x="40" y={234 - t * 210} textAnchor="end" fontSize="10">
-              {Math.round(log ? Math.pow(4097, t) - 1 : t * 4096)}
-            </text>
-          </g>
-        ))}
-        {curves.map((c) => (
-          <path
-            key={c.name}
-            d={Array.from(
-              { length: 63 },
-              (_, i) =>
-                `${i ? "L" : "M"}${45 + ((i + 2) / 64) * 570},${230 - scale(c.f(i + 2)) * 210}`,
-            ).join(" ")}
-            fill="none"
-            stroke={c.color}
-            strokeWidth="2.5"
-          />
-        ))}
+          )),
+        )}
         <line
           x1={45 + (n / 64) * 570}
           x2={45 + (n / 64) * 570}
@@ -897,62 +1038,74 @@ export function Complexity({ space = false }: { space?: boolean }) {
           strokeDasharray="4 4"
         />
         <text x="50" y="256" fontSize="12">
-          2
+          {tr("2")}
         </text>
         <text x="600" y="256" fontSize="12">
-          64
+          {tr("64")}
         </text>
         <text x="280" y="256" fontSize="12">
-          Input size n
+          {tr("Input size n")}
         </text>
       </svg>
       <table>
         <caption>
-          Idealized {space ? "time and memory" : "operation"} counts at n = {n}
+          {i18n.t("Idealized {{kind}} counts at n = {{n}}", {
+            kind: tr(space ? "time and memory" : "operation"),
+            n,
+          })}
         </caption>
         <thead>
           <tr>
-            <th>Growth</th>
-            <th>Count</th>
-            <th>Example</th>
+            <th>{tr("Growth")}</th>
+            <th>{tr("Count")}</th>
+            <th>{tr("Example")}</th>
           </tr>
         </thead>
         <tbody>
-          {curves.map((c, i) => (
-            <tr key={c.name}>
-              <th style={{ color: c.color }}>{c.name}</th>
-              <td>{Math.ceil(c.f(n)).toLocaleString()}</td>
-              <td>
-                {
-                  [
-                    "Array index lookup",
-                    "Binary search comparisons",
-                    "Linear scan / copied array",
-                    "Efficient comparison sorting",
-                    "All pairs comparison",
-                  ][i]
-                }
-              </td>
-            </tr>
-          ))}
+          {tr(
+            curves.map((c, i) => (
+              <tr key={c.name}>
+                <th style={{ color: c.color }}>{tr(c.name)}</th>
+                <td>{tr(Math.ceil(c.f(n)).toLocaleString())}</td>
+                <td>
+                  {tr(
+                    [
+                      "Array index lookup",
+                      "Binary search comparisons",
+                      "Linear scan / copied array",
+                      "Efficient comparison sorting",
+                      "All pairs comparison",
+                    ][i],
+                  )}
+                </td>
+              </tr>
+            )),
+          )}
         </tbody>
       </table>
-      {space && (
-        <div className="tradeoff">
-          <strong>Duplicate detection at n = {n}</strong>
-          <p>
-            Nested pairs: up to {(n * (n - 1)) / 2} comparisons, O(1) auxiliary
-            space.
-          </p>
-          <p>
-            Set membership: up to {n} checks and {n} inserts, typically O(n)
-            total time, up to {n} extra entries: O(n) space.
-          </p>
-        </div>
+      {tr(
+        space && (
+          <div className="tradeoff">
+            <strong>{i18n.t("Duplicate detection at n = {{n}}", { n })}</strong>
+            <p>
+              {i18n.t(
+                "Nested pairs: up to {{n}} comparisons, O(1) auxiliary space.",
+                { n: (n * (n - 1)) / 2 },
+              )}
+            </p>
+            <p>
+              {i18n.t(
+                "Set membership: up to {{n}} checks and {{n}} inserts, typically O(n) total time, up to {{n}} extra entries: O(n) space.",
+                { n },
+              )}
+            </p>
+          </div>
+        ),
       )}
       <p className="fine-print">
-        Base-2 logarithms; illustrative formulas, not benchmarks. The selected
-        vertical scale changes how growth looks, not the underlying counts.
+        {tr(
+          "Base-2 logarithms; illustrative formulas, not benchmarks. The selected vertical scale changes how growth looks, not the underlying counts.",
+        )}
       </p>
     </>
   );

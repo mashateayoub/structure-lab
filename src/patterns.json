@@ -1,0 +1,1240 @@
+[
+  {
+    "id": "factory-method",
+    "category": "creational",
+    "name": {
+      "en": "Factory Method",
+      "fr": "Méthode fabrique"
+    },
+    "intent": {
+      "en": "Defer product creation to a specialized creator.",
+      "fr": "Confier la création du produit à un créateur spécialisé."
+    },
+    "problem": {
+      "en": "A report workflow must send notifications without depending on email or SMS classes.",
+      "fr": "Un traitement de rapports doit envoyer des notifications sans dépendre des classes courriel ou SMS."
+    },
+    "solution": {
+      "en": "The base creator calls a factory method. Subclasses override it and return products sharing the same contract.",
+      "fr": "Le créateur de base appelle une méthode de fabrication. Les sous-classes la redéfinissent et renvoient des produits de même contrat."
+    },
+    "tradeoff": {
+      "en": "Keeps workflow stable, but adds creator subclasses. A simple factory function can suffice for small cases.",
+      "fr": "Stabilise le traitement mais ajoute des sous-classes. Une simple fonction fabrique suffit parfois."
+    },
+    "roles": ["ReportCreator", "EmailCreator", "SmsCreator", "Notifier"],
+    "edges": [
+      [1, 0, "inherits"],
+      [2, 0, "inherits"],
+      [1, 3, "creates"],
+      [2, 3, "creates"]
+    ],
+    "code": "class ReportCreator {\n  createNotifier() { throw new Error('Abstract method'); }\n  deliver(n) { return this.createNotifier().send(n); }\n}\nclass EmailCreator extends ReportCreator {\n  createNotifier() { return { send: n => `Email: ${n}` }; }\n}\nclass SmsCreator extends ReportCreator {\n  createNotifier() { return { send: n => `SMS: ${n}` }; }\n}\nconst creator = alternate ? new SmsCreator() : new EmailCreator();\nconsole.log(creator.deliver(amount));",
+    "question": {
+      "en": "Who chooses the concrete product?",
+      "fr": "Qui choisit le produit concret ?"
+    },
+    "answers": {
+      "en": [
+        "The creator subclass",
+        "The caller of every product method",
+        "The database"
+      ],
+      "fr": [
+        "La sous-classe du créateur",
+        "Chaque appelant des méthodes du produit",
+        "La base de données"
+      ]
+    },
+    "correct": 0,
+    "explanation": {
+      "en": "The subclass overrides creation while inheriting the workflow.",
+      "fr": "La sous-classe redéfinit la création et hérite du traitement."
+    },
+    "variant": {
+      "en": "Use SMS creator",
+      "fr": "Utiliser le créateur SMS"
+    }
+  },
+  {
+    "id": "abstract-factory",
+    "category": "creational",
+    "name": {
+      "en": "Abstract Factory",
+      "fr": "Fabrique abstraite"
+    },
+    "intent": {
+      "en": "Create compatible families of products.",
+      "fr": "Créer des familles de produits compatibles."
+    },
+    "problem": {
+      "en": "Mixing light and dark widgets creates an inconsistent interface.",
+      "fr": "Mélanger des composants clairs et sombres produit une interface incohérente."
+    },
+    "solution": {
+      "en": "Inject a factory with one method per product type. Each concrete factory produces a matching family.",
+      "fr": "Injecter une fabrique avec une méthode par type de produit. Chaque fabrique concrète produit une famille cohérente."
+    },
+    "tradeoff": {
+      "en": "Adding families is easy; adding a product type changes every factory.",
+      "fr": "Ajouter une famille est simple ; ajouter un type de produit modifie toutes les fabriques."
+    },
+    "roles": [
+      "Application",
+      "WidgetFactory",
+      "LightFactory",
+      "DarkFactory",
+      "Button + Panel"
+    ],
+    "edges": [
+      [0, 1, "uses"],
+      [1, 2, "implemented by"],
+      [1, 3, "implemented by"],
+      [2, 4, "creates"],
+      [3, 4, "creates"]
+    ],
+    "code": "const light = { button: () => 'LightButton', panel: () => 'LightPanel' };\nconst dark = { button: () => 'DarkButton', panel: () => 'DarkPanel' };\nfunction screen(factory, count) {\n  return Array.from({ length: count }, () => [factory.button(), factory.panel()]);\n}\nconsole.log(screen(alternate ? dark : light, amount));",
+    "question": {
+      "en": "What must a concrete factory keep consistent?",
+      "fr": "Que doit préserver une fabrique concrète ?"
+    },
+    "answers": {
+      "en": ["A global counter", "The product family", "The number of clients"],
+      "fr": [
+        "Un compteur global",
+        "La famille de produits",
+        "Le nombre de clients"
+      ]
+    },
+    "correct": 1,
+    "explanation": {
+      "en": "Products returned by one factory belong to the same compatible family.",
+      "fr": "Les produits issus d’une fabrique appartiennent à une même famille compatible."
+    },
+    "variant": {
+      "en": "Use dark family",
+      "fr": "Utiliser la famille sombre"
+    }
+  },
+  {
+    "id": "builder",
+    "category": "creational",
+    "name": {
+      "en": "Builder",
+      "fr": "Monteur"
+    },
+    "intent": {
+      "en": "Assemble a complex object one step at a time.",
+      "fr": "Assembler un objet complexe étape par étape."
+    },
+    "problem": {
+      "en": "A report constructor has too many optional parameters and invalid intermediate combinations.",
+      "fr": "Un constructeur de rapport possède trop de paramètres facultatifs et de combinaisons intermédiaires invalides."
+    },
+    "solution": {
+      "en": "Expose named construction steps and a final build operation that returns a finished product.",
+      "fr": "Exposer des étapes de construction nommées et une opération finale qui renvoie le produit terminé."
+    },
+    "tradeoff": {
+      "en": "Clarifies construction; requires a policy for resetting or reusing the builder.",
+      "fr": "Clarifie la construction ; il faut définir comment réinitialiser ou réutiliser le monteur."
+    },
+    "roles": ["Client", "ReportBuilder", "Report"],
+    "edges": [
+      [0, 1, "configures"],
+      [1, 2, "builds"]
+    ],
+    "code": "class ReportBuilder {\n  constructor() { this.sections = []; }\n  title(text) { this.heading = text; return this; }\n  section(text) { this.sections.push(text); return this; }\n  build() { return { title: this.heading, sections: [...this.sections] }; }\n}\nconst builder = new ReportBuilder().title('Report');\nfor (let i = 1; i <= amount; i++) builder.section(`Section ${i}`);\nif (alternate) builder.section('Appendix');\nconsole.log(builder.build());",
+    "question": {
+      "en": "When should the client receive the finished product?",
+      "fr": "Quand le client reçoit-il le produit terminé ?"
+    },
+    "answers": {
+      "en": [
+        "Before the first step",
+        "After every field assignment",
+        "After build()"
+      ],
+      "fr": [
+        "Avant la première étape",
+        "Après chaque affectation",
+        "Après build()"
+      ]
+    },
+    "correct": 2,
+    "explanation": {
+      "en": "Construction steps accumulate state; build returns the completed result.",
+      "fr": "Les étapes accumulent un état ; build renvoie le résultat terminé."
+    },
+    "variant": {
+      "en": "Include appendix",
+      "fr": "Inclure une annexe"
+    }
+  },
+  {
+    "id": "prototype",
+    "category": "creational",
+    "name": {
+      "en": "Prototype",
+      "fr": "Prototype"
+    },
+    "intent": {
+      "en": "Create a new object by copying a configured object.",
+      "fr": "Créer un objet en copiant un objet configuré."
+    },
+    "problem": {
+      "en": "Creating similar documents repeats setup and risks sharing nested mutable state.",
+      "fr": "Créer des documents semblables répète la configuration et risque de partager un état imbriqué modifiable."
+    },
+    "solution": {
+      "en": "Give the configured object a clone operation. Decide explicitly which nested values are copied.",
+      "fr": "Donner à l’objet configuré une opération de clonage. Définir explicitement quelles valeurs imbriquées sont copiées."
+    },
+    "tradeoff": {
+      "en": "Deep copying costs memory and cannot blindly copy every resource or class instance.",
+      "fr": "La copie profonde consomme de la mémoire et ne peut pas copier aveuglément toutes les ressources ou instances."
+    },
+    "roles": ["Client", "DocumentPrototype", "DocumentClone"],
+    "edges": [
+      [0, 1, "asks to clone"],
+      [1, 2, "copies"]
+    ],
+    "code": "const prototype = { title: 'Draft', style: { size: 12 } };\nconst clone = alternate ? { ...prototype } : structuredClone(prototype);\nclone.style.size = amount;\nconsole.log({ original: prototype.style.size, clone: clone.style.size });",
+    "question": {
+      "en": "What risk does a shallow clone carry?",
+      "fr": "Quel risque présente une copie superficielle ?"
+    },
+    "answers": {
+      "en": [
+        "Nested objects can remain shared",
+        "It always loses all properties",
+        "It guarantees isolation"
+      ],
+      "fr": [
+        "Les objets imbriqués peuvent rester partagés",
+        "Elle perd toujours toutes les propriétés",
+        "Elle garantit l’isolation"
+      ]
+    },
+    "correct": 0,
+    "explanation": {
+      "en": "Spread copies the outer object while nested references still point to the same objects.",
+      "fr": "La décomposition copie l’objet externe mais conserve les références imbriquées."
+    },
+    "variant": {
+      "en": "Use shallow copy",
+      "fr": "Utiliser une copie superficielle"
+    }
+  },
+  {
+    "id": "singleton",
+    "category": "creational",
+    "name": {
+      "en": "Singleton",
+      "fr": "Singleton"
+    },
+    "intent": {
+      "en": "Keep one shared instance behind a controlled access point.",
+      "fr": "Conserver une instance partagée derrière un point d’accès contrôlé."
+    },
+    "problem": {
+      "en": "A configuration service should have one identity within this application context.",
+      "fr": "Un service de configuration doit avoir une identité unique dans ce contexte applicatif."
+    },
+    "solution": {
+      "en": "Cache the instance and expose access through one method. Keep its lifetime and ownership explicit.",
+      "fr": "Mettre l’instance en cache et exposer un accès unique. Définir sa durée de vie et son propriétaire."
+    },
+    "tradeoff": {
+      "en": "Global state complicates tests and concurrency. A singleton is per runtime, not automatically across servers.",
+      "fr": "L’état global complique les tests et la concurrence. L’unicité concerne un environnement, pas tous les serveurs."
+    },
+    "roles": ["Client A", "Configuration", "Client B"],
+    "edges": [
+      [0, 1, "getInstance"],
+      [2, 1, "getInstance"]
+    ],
+    "code": "class Configuration {\n  static getInstance() {\n    return Configuration.instance ??= { limit: 1 };\n  }\n}\nconst a = Configuration.getInstance();\nconst b = alternate ? { ...a } : Configuration.getInstance();\na.limit = amount;\nconsole.log({ sameIdentity: a === b, first: a.limit, second: b.limit });",
+    "question": {
+      "en": "Where is this singleton unique?",
+      "fr": "Où ce singleton est-il unique ?"
+    },
+    "answers": {
+      "en": [
+        "Across all browser tabs automatically",
+        "Within this runtime",
+        "Across every server automatically"
+      ],
+      "fr": [
+        "Dans tous les onglets automatiquement",
+        "Dans cet environnement d’exécution",
+        "Sur tous les serveurs automatiquement"
+      ]
+    },
+    "correct": 1,
+    "explanation": {
+      "en": "The cached instance belongs to the JavaScript runtime that holds it.",
+      "fr": "L’instance mise en cache appartient à l’environnement JavaScript qui la contient."
+    },
+    "variant": {
+      "en": "Compare a separate copy",
+      "fr": "Comparer une copie distincte"
+    }
+  },
+  {
+    "id": "adapter",
+    "category": "structural",
+    "name": {
+      "en": "Adapter",
+      "fr": "Adaptateur"
+    },
+    "intent": {
+      "en": "Translate an existing interface into the one a client expects.",
+      "fr": "Traduire une interface existante vers celle attendue par le client."
+    },
+    "problem": {
+      "en": "The checkout expects cents but a legacy provider accepts whole currency units.",
+      "fr": "Le paiement attend des centimes mais un ancien fournisseur accepte des unités monétaires."
+    },
+    "solution": {
+      "en": "Wrap the legacy provider and translate calls and data at the boundary.",
+      "fr": "Envelopper l’ancien fournisseur et traduire les appels et données à la frontière."
+    },
+    "tradeoff": {
+      "en": "Isolates integration details; careless conversion can hide precision or semantic differences.",
+      "fr": "Isole l’intégration ; une conversion imprécise peut masquer des différences de sens ou de précision."
+    },
+    "roles": ["Checkout", "PaymentAdapter", "LegacyGateway"],
+    "edges": [
+      [0, 1, "pay cents"],
+      [1, 2, "pay units"]
+    ],
+    "code": "const legacy = { payUnits: units => units };\nconst adapter = { payCents: cents => legacy.payUnits(cents / 100) };\nconst cents = amount * 100;\nconsole.log({ cents, chargedUnits: alternate ? legacy.payUnits(cents) : adapter.payCents(cents) });",
+    "question": {
+      "en": "What does an adapter change?",
+      "fr": "Que modifie un adaptateur ?"
+    },
+    "answers": {
+      "en": [
+        "The business goal of the client",
+        "The number of users",
+        "The interface seen by the client"
+      ],
+      "fr": [
+        "L’objectif métier du client",
+        "Le nombre d’utilisateurs",
+        "L’interface vue par le client"
+      ]
+    },
+    "correct": 2,
+    "explanation": {
+      "en": "The wrapper translates the client contract into the existing provider contract.",
+      "fr": "L’enveloppe traduit le contrat client vers celui du fournisseur existant."
+    },
+    "variant": {
+      "en": "Bypass adapter",
+      "fr": "Contourner l’adaptateur"
+    }
+  },
+  {
+    "id": "bridge",
+    "category": "structural",
+    "name": {
+      "en": "Bridge",
+      "fr": "Pont"
+    },
+    "intent": {
+      "en": "Let abstraction and implementation evolve independently.",
+      "fr": "Faire évoluer abstraction et implémentation indépendamment."
+    },
+    "problem": {
+      "en": "A remote-control hierarchy multiplied by device types produces too many subclasses.",
+      "fr": "Une hiérarchie de télécommandes multipliée par les types d’appareils produit trop de sous-classes."
+    },
+    "solution": {
+      "en": "Have each remote contain a device interface instead of inheriting a device-specific remote.",
+      "fr": "Chaque télécommande contient une interface d’appareil au lieu d’hériter d’une télécommande propre à un appareil."
+    },
+    "tradeoff": {
+      "en": "Composition separates two dimensions but adds indirection.",
+      "fr": "La composition sépare deux dimensions mais ajoute une indirection."
+    },
+    "roles": ["Remote", "Device", "Television", "Radio"],
+    "edges": [
+      [0, 1, "delegates"],
+      [1, 2, "implemented by"],
+      [1, 3, "implemented by"]
+    ],
+    "code": "class Remote {\n  constructor(device) { this.device = device; }\n  louder(n) { return this.device.setVolume(n); }\n}\nconst tv = { setVolume: n => ({ device: 'TV', volume: n }) };\nconst radio = { setVolume: n => ({ device: 'Radio', volume: n }) };\nconsole.log(new Remote(alternate ? radio : tv).louder(amount));",
+    "question": {
+      "en": "Which two dimensions does this bridge separate?",
+      "fr": "Quelles dimensions ce pont sépare-t-il ?"
+    },
+    "answers": {
+      "en": [
+        "Remote controls and devices",
+        "Indexes and keys",
+        "Inputs and outputs only"
+      ],
+      "fr": [
+        "Télécommandes et appareils",
+        "Indices et clés",
+        "Seulement les entrées et sorties"
+      ]
+    },
+    "correct": 0,
+    "explanation": {
+      "en": "A remote depends on the device contract, so both hierarchies can grow separately.",
+      "fr": "La télécommande dépend du contrat d’appareil ; les deux hiérarchies évoluent séparément."
+    },
+    "variant": {
+      "en": "Use radio implementation",
+      "fr": "Utiliser l’implémentation radio"
+    }
+  },
+  {
+    "id": "composite",
+    "category": "structural",
+    "name": {
+      "en": "Composite",
+      "fr": "Composite"
+    },
+    "intent": {
+      "en": "Treat a leaf and a tree of objects through one contract.",
+      "fr": "Traiter une feuille et un arbre d’objets avec un même contrat."
+    },
+    "problem": {
+      "en": "A price calculator must handle individual items and nested bundles.",
+      "fr": "Un calculateur de prix doit gérer des articles et des lots imbriqués."
+    },
+    "solution": {
+      "en": "Both leaves and containers expose total(). A container recursively delegates to its children.",
+      "fr": "Feuilles et conteneurs exposent total(). Un conteneur délègue récursivement à ses enfants."
+    },
+    "tradeoff": {
+      "en": "Uniform traversal is convenient, but not every operation makes sense for leaves.",
+      "fr": "Le parcours uniforme est pratique, mais toutes les opérations ne conviennent pas aux feuilles."
+    },
+    "roles": ["Client", "PricedComponent", "Item", "Bundle"],
+    "edges": [
+      [0, 1, "total"],
+      [1, 2, "implemented by"],
+      [1, 3, "implemented by"],
+      [3, 1, "contains"]
+    ],
+    "code": "const item = price => ({ total: () => price });\nconst bundle = children => ({ total: () => children.reduce((sum, c) => sum + c.total(), 0) });\nconst basket = bundle([item(amount), bundle([item(2), item(3)])]);\nconsole.log((alternate ? item(amount) : basket).total());",
+    "question": {
+      "en": "How does a container calculate its total?",
+      "fr": "Comment un conteneur calcule-t-il son total ?"
+    },
+    "answers": {
+      "en": [
+        "By checking every concrete class",
+        "By delegating to its children",
+        "By ignoring nested containers"
+      ],
+      "fr": [
+        "En vérifiant chaque classe concrète",
+        "En déléguant à ses enfants",
+        "En ignorant les conteneurs imbriqués"
+      ]
+    },
+    "correct": 1,
+    "explanation": {
+      "en": "Recursion works because leaves and composites expose the same operation.",
+      "fr": "La récursion fonctionne car feuilles et composites exposent la même opération."
+    },
+    "variant": {
+      "en": "Evaluate leaf only",
+      "fr": "Évaluer seulement la feuille"
+    }
+  },
+  {
+    "id": "decorator",
+    "category": "structural",
+    "name": {
+      "en": "Decorator",
+      "fr": "Décorateur"
+    },
+    "intent": {
+      "en": "Add behavior by wrapping an object with the same contract.",
+      "fr": "Ajouter un comportement en enveloppant un objet de même contrat."
+    },
+    "problem": {
+      "en": "Notifications need optional logging and encryption in different combinations.",
+      "fr": "Les notifications nécessitent journalisation et chiffrement facultatifs dans diverses combinaisons."
+    },
+    "solution": {
+      "en": "Each decorator implements send() and calls the wrapped sender before or after its own work.",
+      "fr": "Chaque décorateur implémente send() et appelle l’objet enveloppé avant ou après son propre travail."
+    },
+    "tradeoff": {
+      "en": "Flexible combinations can be harder to debug; wrapper order changes behavior.",
+      "fr": "Les combinaisons flexibles compliquent le débogage ; l’ordre des enveloppes change le comportement."
+    },
+    "roles": ["Client", "Sender", "LoggedSender", "EncryptedSender"],
+    "edges": [
+      [0, 1, "send"],
+      [2, 1, "wraps"],
+      [3, 2, "wraps"]
+    ],
+    "code": "const base = { send: value => String(value) };\nconst logged = inner => ({ send: value => `log(${inner.send(value)})` });\nconst encoded = inner => ({ send: value => `encoded(${inner.send(value)})` });\nconst sender = alternate ? logged(encoded(base)) : encoded(logged(base));\nconsole.log(sender.send(amount));",
+    "question": {
+      "en": "What must a decorator preserve?",
+      "fr": "Que doit préserver un décorateur ?"
+    },
+    "answers": {
+      "en": [
+        "The concrete class name",
+        "The number of fields",
+        "The wrapped contract"
+      ],
+      "fr": [
+        "Le nom de la classe concrète",
+        "Le nombre de champs",
+        "Le contrat enveloppé"
+      ]
+    },
+    "correct": 2,
+    "explanation": {
+      "en": "The client can use a decorated sender through the same send operation.",
+      "fr": "Le client utilise un expéditeur décoré via la même opération send."
+    },
+    "variant": {
+      "en": "Reverse wrapper order",
+      "fr": "Inverser l’ordre des enveloppes"
+    }
+  },
+  {
+    "id": "facade",
+    "category": "structural",
+    "name": {
+      "en": "Facade",
+      "fr": "Façade"
+    },
+    "intent": {
+      "en": "Offer one focused entry point to a complex subsystem.",
+      "fr": "Offrir un point d’entrée ciblé vers un sous-système complexe."
+    },
+    "problem": {
+      "en": "Every client repeats audio, video, and network startup in the correct order.",
+      "fr": "Chaque client répète le démarrage audio, vidéo et réseau dans le bon ordre."
+    },
+    "solution": {
+      "en": "A facade coordinates subsystem calls behind a simpler operation; advanced clients can still use the subsystem.",
+      "fr": "Une façade coordonne les appels derrière une opération simple ; les clients avancés peuvent encore accéder au sous-système."
+    },
+    "tradeoff": {
+      "en": "Reduces coupling at call sites; avoid letting the facade become an all-purpose service.",
+      "fr": "Réduit le couplage des appelants ; éviter une façade qui devient un service universel."
+    },
+    "roles": ["Client", "StudioFacade", "Audio", "Video", "Network"],
+    "edges": [
+      [0, 1, "start"],
+      [1, 2, "coordinates"],
+      [1, 3, "coordinates"],
+      [1, 4, "coordinates"]
+    ],
+    "code": "const audio = n => `audio:${n}`;\nconst video = n => `video:${n}`;\nconst network = () => 'connected';\nconst studio = { start: n => [network(), audio(n), video(n)] };\nconsole.log(alternate ? [audio(amount), video(amount)] : studio.start(amount));",
+    "question": {
+      "en": "What is the primary goal of a facade?",
+      "fr": "Quel est l’objectif principal d’une façade ?"
+    },
+    "answers": {
+      "en": [
+        "Simplify subsystem access",
+        "Enforce one instance",
+        "Copy every subsystem"
+      ],
+      "fr": [
+        "Simplifier l’accès au sous-système",
+        "Imposer une instance unique",
+        "Copier chaque sous-système"
+      ]
+    },
+    "correct": 0,
+    "explanation": {
+      "en": "The facade coordinates existing operations through a smaller interface.",
+      "fr": "La façade coordonne des opérations existantes via une interface réduite."
+    },
+    "variant": {
+      "en": "Call subsystem directly",
+      "fr": "Appeler directement le sous-système"
+    }
+  },
+  {
+    "id": "flyweight",
+    "category": "structural",
+    "name": {
+      "en": "Flyweight",
+      "fr": "Poids mouche"
+    },
+    "intent": {
+      "en": "Share immutable intrinsic state across many objects.",
+      "fr": "Partager un état intrinsèque immuable entre de nombreux objets."
+    },
+    "problem": {
+      "en": "A forest repeats the same species data for thousands of positioned trees.",
+      "fr": "Une forêt répète les mêmes données d’espèce pour des milliers d’arbres positionnés."
+    },
+    "solution": {
+      "en": "Pool species objects by key; keep each tree’s coordinates outside the shared object.",
+      "fr": "Mettre les espèces en commun par clé ; conserver les coordonnées hors de l’objet partagé."
+    },
+    "tradeoff": {
+      "en": "Saves repeated state but adds pooling overhead and requires immutable shared values.",
+      "fr": "Économise l’état répété mais ajoute une gestion de réserve et exige un état partagé immuable."
+    },
+    "roles": ["Forest", "TreePosition", "SpeciesPool", "SharedSpecies"],
+    "edges": [
+      [0, 1, "contains"],
+      [1, 3, "references"],
+      [2, 3, "reuses"]
+    ],
+    "code": "const pool = new Map();\nfunction species(name) {\n  if (!pool.has(name)) pool.set(name, Object.freeze({ name, texture: 'bark' }));\n  return pool.get(name);\n}\nconst trees = Array.from({ length: amount }, (_, x) => ({\n  x, species: alternate ? { name: 'oak', texture: 'bark' } : species('oak')\n}));\nconsole.log({ trees: trees.length, speciesObjects: new Set(trees.map(t => t.species)).size });",
+    "question": {
+      "en": "Which state should stay outside the shared flyweight?",
+      "fr": "Quel état doit rester hors du poids mouche partagé ?"
+    },
+    "answers": {
+      "en": [
+        "The shared texture",
+        "Each tree’s coordinates",
+        "The immutable species name"
+      ],
+      "fr": [
+        "La texture partagée",
+        "Les coordonnées de chaque arbre",
+        "Le nom immuable de l’espèce"
+      ]
+    },
+    "correct": 1,
+    "explanation": {
+      "en": "Coordinates vary per tree; species data can be shared.",
+      "fr": "Les coordonnées varient par arbre ; les données d’espèce sont partageables."
+    },
+    "variant": {
+      "en": "Disable sharing",
+      "fr": "Désactiver le partage"
+    }
+  },
+  {
+    "id": "proxy",
+    "category": "structural",
+    "name": {
+      "en": "Proxy",
+      "fr": "Procuration"
+    },
+    "intent": {
+      "en": "Control access to an object through a stand-in.",
+      "fr": "Contrôler l’accès à un objet via un intermédiaire."
+    },
+    "problem": {
+      "en": "A costly image should load only when requested, and repeated requests should reuse it.",
+      "fr": "Une image coûteuse doit se charger à la demande et être réutilisée."
+    },
+    "solution": {
+      "en": "A proxy preserves the service contract while checking access, caching, or delaying initialization.",
+      "fr": "Une procuration préserve le contrat tout en contrôlant l’accès, le cache ou l’initialisation différée."
+    },
+    "tradeoff": {
+      "en": "Hidden delays and stale caches need clear invalidation and error policies.",
+      "fr": "Les délais cachés et caches périmés exigent une politique claire d’invalidation et d’erreur."
+    },
+    "roles": ["Client", "ImageProxy", "ImageService"],
+    "edges": [
+      [0, 1, "load"],
+      [1, 2, "delegates lazily"]
+    ],
+    "code": "let loads = 0;\nconst service = { load: key => { loads++; return `image:${key}`; } };\nconst cache = new Map();\nconst proxy = { load(key) {\n  if (!cache.has(key)) cache.set(key, service.load(key));\n  return cache.get(key);\n} };\nfor (let i = 0; i < amount; i++) (alternate ? service : proxy).load('hero');\nconsole.log({ requests: amount, actualLoads: loads });",
+    "question": {
+      "en": "How does a proxy differ from an adapter?",
+      "fr": "En quoi une procuration diffère-t-elle d’un adaptateur ?"
+    },
+    "answers": {
+      "en": [
+        "It must rename every method",
+        "It always clones the service",
+        "It preserves the service interface"
+      ],
+      "fr": [
+        "Elle doit renommer chaque méthode",
+        "Elle clone toujours le service",
+        "Elle préserve l’interface du service"
+      ]
+    },
+    "correct": 2,
+    "explanation": {
+      "en": "A proxy controls access through the same contract; an adapter translates a contract.",
+      "fr": "Une procuration contrôle l’accès via le même contrat ; un adaptateur traduit un contrat."
+    },
+    "variant": {
+      "en": "Bypass cache proxy",
+      "fr": "Contourner le cache"
+    }
+  },
+  {
+    "id": "chain-of-responsibility",
+    "category": "behavioral",
+    "name": {
+      "en": "Chain of Responsibility",
+      "fr": "Chaîne de responsabilité"
+    },
+    "intent": {
+      "en": "Pass a request through handlers until one deals with it.",
+      "fr": "Transmettre une requête jusqu’à ce qu’un gestionnaire la traite."
+    },
+    "problem": {
+      "en": "Support tickets need routing without coupling the sender to every department.",
+      "fr": "Les demandes d’assistance doivent être orientées sans coupler l’expéditeur à chaque service."
+    },
+    "solution": {
+      "en": "Each handler handles a request or forwards it to its successor. Define an explicit unhandled result.",
+      "fr": "Chaque gestionnaire traite la requête ou la transmet au suivant. Définir un résultat explicite si aucun ne la traite."
+    },
+    "tradeoff": {
+      "en": "Order is significant; a request may go unhandled.",
+      "fr": "L’ordre est significatif ; une requête peut rester sans traitement."
+    },
+    "roles": ["Request", "FrontDesk", "Specialist", "Escalation"],
+    "edges": [
+      [0, 1, "submit"],
+      [1, 2, "forward"],
+      [2, 3, "forward"]
+    ],
+    "code": "const handler = (limit, name, next) => value =>\n  value <= limit ? name : next(value);\nconst end = _ => 'Escalation';\nconst specialist = handler(7, 'Specialist', end);\nconst front = handler(3, 'FrontDesk', specialist);\nconsole.log((alternate ? specialist : front)(amount));",
+    "question": {
+      "en": "What happens if no handler accepts a request?",
+      "fr": "Que se passe-t-il si aucun gestionnaire n’accepte ?"
+    },
+    "answers": {
+      "en": [
+        "The chain needs an explicit fallback",
+        "The first handler must always run",
+        "The request is automatically successful"
+      ],
+      "fr": [
+        "La chaîne nécessite un recours explicite",
+        "Le premier doit toujours traiter",
+        "La requête réussit automatiquement"
+      ]
+    },
+    "correct": 0,
+    "explanation": {
+      "en": "This chain ends in an escalation handler instead of silently dropping work.",
+      "fr": "Cette chaîne se termine par une escalade plutôt que d’ignorer la demande."
+    },
+    "variant": {
+      "en": "Skip front desk",
+      "fr": "Ignorer l’accueil"
+    }
+  },
+  {
+    "id": "command",
+    "category": "behavioral",
+    "name": {
+      "en": "Command",
+      "fr": "Commande"
+    },
+    "intent": {
+      "en": "Turn a request into an object that can be queued or undone.",
+      "fr": "Transformer une requête en objet à mettre en file ou annuler."
+    },
+    "problem": {
+      "en": "A toolbar must execute edits and undo them without knowing document internals.",
+      "fr": "Une barre d’outils doit exécuter et annuler des modifications sans connaître le document."
+    },
+    "solution": {
+      "en": "Commands capture a receiver and arguments. An invoker executes commands and keeps history for undo.",
+      "fr": "Les commandes capturent un récepteur et des arguments. Un invocateur les exécute et conserve un historique."
+    },
+    "tradeoff": {
+      "en": "Undo needs saved prior state or a real inverse; irreversible effects require compensation.",
+      "fr": "L’annulation nécessite un état précédent ou une véritable inverse ; les effets irréversibles nécessitent compensation."
+    },
+    "roles": ["Toolbar", "Command", "AddCommand", "Document"],
+    "edges": [
+      [0, 1, "execute / undo"],
+      [1, 2, "implemented by"],
+      [2, 3, "changes"]
+    ],
+    "code": "const document = { value: 0 };\nconst add = { execute() { document.value += amount; }, undo() { document.value -= amount; } };\nadd.execute();\nconsole.log(document.value);\nif (alternate) { add.undo(); console.log(document.value); }",
+    "question": {
+      "en": "Where should the information needed to undo live?",
+      "fr": "Où conserver les informations nécessaires à l’annulation ?"
+    },
+    "answers": {
+      "en": [
+        "Nowhere",
+        "In the command or its history",
+        "Only in the toolbar label"
+      ],
+      "fr": [
+        "Nulle part",
+        "Dans la commande ou son historique",
+        "Seulement dans le libellé du bouton"
+      ]
+    },
+    "correct": 1,
+    "explanation": {
+      "en": "The command retains enough context to reverse its change.",
+      "fr": "La commande conserve assez de contexte pour inverser son changement."
+    },
+    "variant": {
+      "en": "Undo after execute",
+      "fr": "Annuler après exécution"
+    }
+  },
+  {
+    "id": "iterator",
+    "category": "behavioral",
+    "name": {
+      "en": "Iterator",
+      "fr": "Itérateur"
+    },
+    "intent": {
+      "en": "Traverse a collection without exposing its storage.",
+      "fr": "Parcourir une collection sans exposer son stockage."
+    },
+    "problem": {
+      "en": "A playlist needs forward and reverse walks without callers reading its internal array.",
+      "fr": "Une liste de lecture doit être parcourue dans les deux sens sans exposer son tableau interne."
+    },
+    "solution": {
+      "en": "Return an iterator that owns traversal position and yields values through a standard protocol.",
+      "fr": "Renvoyer un itérateur qui conserve la position et fournit les valeurs via un protocole standard."
+    },
+    "tradeoff": {
+      "en": "Define what mutation during iteration means; independent iterators should have independent cursors.",
+      "fr": "Définir le comportement des mutations pendant le parcours ; les curseurs doivent être indépendants."
+    },
+    "roles": ["Client", "IterableCollection", "Iterator", "Item"],
+    "edges": [
+      [0, 1, "requests iterator"],
+      [1, 2, "creates"],
+      [2, 3, "yields"]
+    ],
+    "code": "class Playlist {\n  constructor(values) { this.values = values; }\n  *walk(reverse) {\n    const snapshot = [...this.values];\n    if (reverse) snapshot.reverse();\n    for (const value of snapshot) yield value;\n  }\n}\nconst list = new Playlist(Array.from({ length: amount }, (_, i) => i + 1));\nconsole.log([...list.walk(alternate)]);",
+    "question": {
+      "en": "What does an iterator encapsulate?",
+      "fr": "Que contient un itérateur ?"
+    },
+    "answers": {
+      "en": [
+        "All application configuration",
+        "Only the collection name",
+        "Traversal position and order"
+      ],
+      "fr": [
+        "Toute la configuration applicative",
+        "Seulement le nom de collection",
+        "La position et l’ordre du parcours"
+      ]
+    },
+    "correct": 2,
+    "explanation": {
+      "en": "The caller asks for the next value without knowing the storage layout.",
+      "fr": "L’appelant demande la prochaine valeur sans connaître le stockage."
+    },
+    "variant": {
+      "en": "Reverse traversal",
+      "fr": "Inverser le parcours"
+    }
+  },
+  {
+    "id": "mediator",
+    "category": "behavioral",
+    "name": {
+      "en": "Mediator",
+      "fr": "Médiateur"
+    },
+    "intent": {
+      "en": "Coordinate collaboration through a central object.",
+      "fr": "Coordonner la collaboration via un objet central."
+    },
+    "problem": {
+      "en": "Chat participants should not keep references to every other participant.",
+      "fr": "Les participants d’une discussion ne doivent pas référencer tous les autres."
+    },
+    "solution": {
+      "en": "Participants communicate through a room that routes messages to registered peers.",
+      "fr": "Les participants communiquent via un salon qui distribue les messages aux membres inscrits."
+    },
+    "tradeoff": {
+      "en": "Reduces peer coupling, but a mediator can accumulate too many responsibilities.",
+      "fr": "Réduit le couplage entre pairs mais le médiateur peut accumuler trop de responsabilités."
+    },
+    "roles": ["Participant A", "ChatRoom", "Participant B", "Participant C"],
+    "edges": [
+      [0, 1, "send"],
+      [1, 2, "deliver"],
+      [1, 3, "deliver"]
+    ],
+    "code": "const inboxes = { Ada: [], Lin: [], Sam: [] };\nconst room = { send(from, text) {\n  for (const name of Object.keys(inboxes)) {\n    if (name !== from) inboxes[name].push(text);\n  }\n} };\nfor (let i = 1; i <= amount; i++) room.send(alternate ? 'Lin' : 'Ada', String(i));\nconsole.log(inboxes);",
+    "question": {
+      "en": "Who knows the routing rules?",
+      "fr": "Qui connaît les règles de distribution ?"
+    },
+    "answers": {
+      "en": [
+        "The mediator",
+        "Every participant independently",
+        "The message text"
+      ],
+      "fr": [
+        "Le médiateur",
+        "Chaque participant indépendamment",
+        "Le texte du message"
+      ]
+    },
+    "correct": 0,
+    "explanation": {
+      "en": "Participants know the room; the room coordinates their interactions.",
+      "fr": "Les participants connaissent le salon ; celui-ci coordonne leurs interactions."
+    },
+    "variant": {
+      "en": "Send as Lin",
+      "fr": "Envoyer en tant que Lin"
+    }
+  },
+  {
+    "id": "memento",
+    "category": "behavioral",
+    "name": {
+      "en": "Memento",
+      "fr": "Mémento"
+    },
+    "intent": {
+      "en": "Restore previous state without exposing its representation.",
+      "fr": "Restaurer un état antérieur sans exposer sa représentation."
+    },
+    "problem": {
+      "en": "An editor needs checkpoints without the history manager manipulating private state.",
+      "fr": "Un éditeur nécessite des points de sauvegarde sans exposer son état privé à l’historique."
+    },
+    "solution": {
+      "en": "The originator creates and restores snapshots. The caretaker stores opaque mementos.",
+      "fr": "L’objet d’origine crée et restaure les instantanés. Le gardien conserve des mémentos opaques."
+    },
+    "tradeoff": {
+      "en": "Snapshots consume memory; external effects are not reverted by restoring local state.",
+      "fr": "Les instantanés consomment de la mémoire ; restaurer un état local n’annule pas les effets externes."
+    },
+    "roles": ["History caretaker", "Editor originator", "Memento"],
+    "edges": [
+      [0, 1, "requests save / restore"],
+      [1, 2, "creates"],
+      [0, 2, "stores"]
+    ],
+    "code": "class Editor {\n  #text = 'Draft';\n  set(text) { this.#text = text; }\n  save() { const text = this.#text; return Object.freeze({ restore: () => { this.#text = text; } }); }\n  restore(snapshot) { snapshot.restore(); }\n  read() { return this.#text; }\n}\nconst editor = new Editor();\nconst checkpoint = editor.save();\neditor.set('x'.repeat(amount));\nif (alternate) editor.restore(checkpoint);\nconsole.log(editor.read());",
+    "question": {
+      "en": "Who understands the snapshot’s internal state?",
+      "fr": "Qui comprend l’état interne de l’instantané ?"
+    },
+    "answers": {
+      "en": ["Only the UI button", "The originator", "Every history client"],
+      "fr": [
+        "Seulement le bouton",
+        "L’objet d’origine",
+        "Chaque client de l’historique"
+      ]
+    },
+    "correct": 1,
+    "explanation": {
+      "en": "The editor saves and restores its state; history only holds the snapshot.",
+      "fr": "L’éditeur sauvegarde et restaure son état ; l’historique conserve seulement l’instantané."
+    },
+    "variant": {
+      "en": "Restore checkpoint",
+      "fr": "Restaurer le point de sauvegarde"
+    }
+  },
+  {
+    "id": "observer",
+    "category": "behavioral",
+    "name": {
+      "en": "Observer",
+      "fr": "Observateur"
+    },
+    "intent": {
+      "en": "Notify subscribers when a publisher changes.",
+      "fr": "Notifier les abonnés lorsqu’un éditeur change."
+    },
+    "problem": {
+      "en": "A price display and an alert both need updates without the price source naming them.",
+      "fr": "Un affichage de prix et une alerte doivent être actualisés sans être nommés par la source."
+    },
+    "solution": {
+      "en": "The publisher stores subscription callbacks and broadcasts events; provide unsubscribe to manage lifetime.",
+      "fr": "L’éditeur conserve des rappels et diffuse les événements ; fournir un désabonnement pour gérer la durée de vie."
+    },
+    "tradeoff": {
+      "en": "Leaks, notification order, and reentrant updates need attention.",
+      "fr": "Surveiller les fuites, l’ordre des notifications et les mises à jour réentrantes."
+    },
+    "roles": ["PricePublisher", "Subscriber", "PriceDisplay", "PriceAlert"],
+    "edges": [
+      [0, 1, "notifies"],
+      [1, 2, "implemented by"],
+      [1, 3, "implemented by"]
+    ],
+    "code": "const listeners = new Set();\nconst subscribe = fn => { listeners.add(fn); return () => listeners.delete(fn); };\nconst events = [];\nsubscribe(n => events.push(`display:${n}`));\nconst unsubscribe = subscribe(n => events.push(`alert:${n}`));\nif (alternate) unsubscribe();\nfor (const fn of [...listeners]) fn(amount);\nconsole.log(events);",
+    "question": {
+      "en": "Why expose an unsubscribe operation?",
+      "fr": "Pourquoi exposer une opération de désabonnement ?"
+    },
+    "answers": {
+      "en": [
+        "To create a singleton",
+        "To reverse every event",
+        "To release subscriptions when no longer needed"
+      ],
+      "fr": [
+        "Pour créer un singleton",
+        "Pour inverser chaque événement",
+        "Pour libérer les abonnements inutiles"
+      ]
+    },
+    "correct": 2,
+    "explanation": {
+      "en": "An unused callback can retain objects and receive unwanted updates.",
+      "fr": "Un rappel inutilisé peut retenir des objets et recevoir des mises à jour indésirables."
+    },
+    "variant": {
+      "en": "Unsubscribe alert",
+      "fr": "Désabonner l’alerte"
+    }
+  },
+  {
+    "id": "state",
+    "category": "behavioral",
+    "name": {
+      "en": "State",
+      "fr": "État"
+    },
+    "intent": {
+      "en": "Change behavior when an object’s internal state changes.",
+      "fr": "Modifier le comportement selon l’état interne d’un objet."
+    },
+    "problem": {
+      "en": "A document allows different actions when draft, reviewed, or published.",
+      "fr": "Un document autorise des actions différentes selon qu’il est brouillon, relu ou publié."
+    },
+    "solution": {
+      "en": "Delegate actions to a state object. Transitions replace that object and define legal next actions.",
+      "fr": "Déléguer les actions à un objet état. Les transitions le remplacent et définissent les actions légales."
+    },
+    "tradeoff": {
+      "en": "Clarifies transitions but can introduce many small state objects.",
+      "fr": "Clarifie les transitions mais peut introduire de nombreux petits objets état."
+    },
+    "roles": ["Document context", "State", "Draft", "Published"],
+    "edges": [
+      [0, 1, "delegates"],
+      [1, 2, "implemented by"],
+      [1, 3, "implemented by"],
+      [2, 3, "transitions"]
+    ],
+    "code": "const published = { name: 'Published', advance: context => { context.message = 'Already published'; } };\nconst draft = { name: 'Draft', advance: context => { context.state = published; } };\nconst context = { state: alternate ? published : draft, message: '' };\nfor (let i = 0; i < amount; i++) context.state.advance(context);\nconsole.log({ state: context.state.name, message: context.message });",
+    "question": {
+      "en": "What drives a State transition?",
+      "fr": "Qu’est-ce qui déclenche une transition d’état ?"
+    },
+    "answers": {
+      "en": [
+        "The context’s lifecycle rules",
+        "Always the array length",
+        "Only a new subclass definition"
+      ],
+      "fr": [
+        "Les règles du cycle de vie du contexte",
+        "Toujours la taille du tableau",
+        "Seulement une nouvelle sous-classe"
+      ]
+    },
+    "correct": 0,
+    "explanation": {
+      "en": "States encode legal actions and transitions for the context.",
+      "fr": "Les états définissent les actions et transitions légales du contexte."
+    },
+    "variant": {
+      "en": "Start published",
+      "fr": "Commencer à l’état publié"
+    }
+  },
+  {
+    "id": "strategy",
+    "category": "behavioral",
+    "name": {
+      "en": "Strategy",
+      "fr": "Stratégie"
+    },
+    "intent": {
+      "en": "Swap an algorithm behind a stable contract.",
+      "fr": "Remplacer un algorithme derrière un contrat stable."
+    },
+    "problem": {
+      "en": "A shipping calculator needs interchangeable pricing policies.",
+      "fr": "Un calculateur de livraison nécessite des politiques tarifaires interchangeables."
+    },
+    "solution": {
+      "en": "Inject a strategy function or object; the context delegates calculation without branching on each policy.",
+      "fr": "Injecter une fonction ou un objet stratégie ; le contexte délègue le calcul sans tester chaque politique."
+    },
+    "tradeoff": {
+      "en": "Callers must choose an appropriate strategy and understand its assumptions.",
+      "fr": "Les appelants doivent choisir une stratégie adaptée et comprendre ses hypothèses."
+    },
+    "roles": [
+      "ShippingContext",
+      "PricingStrategy",
+      "StandardPricing",
+      "ExpressPricing"
+    ],
+    "edges": [
+      [0, 1, "calculate"],
+      [1, 2, "implemented by"],
+      [1, 3, "implemented by"]
+    ],
+    "code": "const standard = weight => weight * 2;\nconst express = weight => weight * 4 + 5;\nclass Shipping {\n  constructor(strategy) { this.strategy = strategy; }\n  quote(weight) { return this.strategy(weight); }\n}\nconsole.log(new Shipping(alternate ? express : standard).quote(amount));",
+    "question": {
+      "en": "Who usually selects a Strategy?",
+      "fr": "Qui choisit habituellement une stratégie ?"
+    },
+    "answers": {
+      "en": [
+        "The JavaScript parser",
+        "The client configuring the context",
+        "A hidden lifecycle transition only"
+      ],
+      "fr": [
+        "L’analyseur JavaScript",
+        "Le client qui configure le contexte",
+        "Seulement une transition interne cachée"
+      ]
+    },
+    "correct": 1,
+    "explanation": {
+      "en": "Strategies vary an algorithm; State varies behavior according to lifecycle.",
+      "fr": "La stratégie fait varier un algorithme ; l’état fait varier le comportement selon le cycle de vie."
+    },
+    "variant": {
+      "en": "Use express pricing",
+      "fr": "Utiliser le tarif express"
+    }
+  },
+  {
+    "id": "template-method",
+    "category": "behavioral",
+    "name": {
+      "en": "Template Method",
+      "fr": "Patron de méthode"
+    },
+    "intent": {
+      "en": "Fix an algorithm’s outline while allowing selected steps to vary.",
+      "fr": "Fixer la structure d’un algorithme en permettant de varier certaines étapes."
+    },
+    "problem": {
+      "en": "Importers share read, parse, validate, and save steps but parse different formats.",
+      "fr": "Des importateurs partagent lecture, analyse, validation et sauvegarde mais lisent différents formats."
+    },
+    "solution": {
+      "en": "The base method defines the sequence and calls overridable hooks for the variable parts.",
+      "fr": "La méthode de base définit la séquence et appelle des étapes redéfinissables."
+    },
+    "tradeoff": {
+      "en": "Inheritance couples subclasses to the base workflow; strategy offers composition instead.",
+      "fr": "L’héritage couple les sous-classes au traitement de base ; la stratégie permet la composition."
+    },
+    "roles": ["Client", "Importer template", "CsvImporter", "JsonImporter"],
+    "edges": [
+      [0, 1, "run"],
+      [1, 2, "overridden steps"],
+      [1, 3, "overridden steps"]
+    ],
+    "code": "class Importer {\n  run(raw) { return this.parse(raw).map(Number).filter(Number.isFinite); }\n  parse(raw) { throw new Error('Abstract method'); }\n}\nclass CsvImporter extends Importer { parse(raw) { return raw.split(','); } }\nclass JsonImporter extends Importer { parse(raw) { return JSON.parse(raw); } }\nconst importer = alternate ? new JsonImporter() : new CsvImporter();\nconsole.log(importer.run(alternate ? JSON.stringify([amount, 2]) : `${amount},2`));",
+    "question": {
+      "en": "What remains fixed in Template Method?",
+      "fr": "Que reste-t-il fixe dans le patron de méthode ?"
+    },
+    "answers": {
+      "en": [
+        "Every implementation detail",
+        "The input values",
+        "The order of algorithm steps"
+      ],
+      "fr": [
+        "Tous les détails d’implémentation",
+        "Les valeurs d’entrée",
+        "L’ordre des étapes de l’algorithme"
+      ]
+    },
+    "correct": 2,
+    "explanation": {
+      "en": "Subclasses customize steps while the template controls their sequence.",
+      "fr": "Les sous-classes personnalisent les étapes ; le patron contrôle leur séquence."
+    },
+    "variant": {
+      "en": "Use JSON importer",
+      "fr": "Utiliser l’importateur JSON"
+    }
+  },
+  {
+    "id": "visitor",
+    "category": "behavioral",
+    "name": {
+      "en": "Visitor",
+      "fr": "Visiteur"
+    },
+    "intent": {
+      "en": "Add operations to a stable object hierarchy.",
+      "fr": "Ajouter des opérations à une hiérarchie d’objets stable."
+    },
+    "problem": {
+      "en": "An expression tree needs printing and evaluation without mixing both into every node.",
+      "fr": "Un arbre d’expressions nécessite affichage et évaluation sans les mélanger dans chaque nœud."
+    },
+    "solution": {
+      "en": "Nodes accept a visitor and dispatch to the method for their concrete type. Visitors implement each operation.",
+      "fr": "Les nœuds acceptent un visiteur et appellent sa méthode propre au type concret. Chaque visiteur implémente une opération."
+    },
+    "tradeoff": {
+      "en": "Adding operations is easy; adding node types requires changing every visitor.",
+      "fr": "Ajouter des opérations est simple ; ajouter un type de nœud modifie chaque visiteur."
+    },
+    "roles": ["Client", "Element.accept", "NumberNode", "AddNode", "Visitor"],
+    "edges": [
+      [0, 1, "accept visitor"],
+      [1, 2, "implemented by"],
+      [1, 3, "implemented by"],
+      [2, 4, "visitNumber"],
+      [3, 4, "visitAdd"]
+    ],
+    "code": "const number = value => ({ accept: visitor => visitor.number(value) });\nconst add = (a, b) => ({ accept: visitor => visitor.add(a, b) });\nconst evaluate = { number: n => n, add: (a, b) => a.accept(evaluate) + b.accept(evaluate) };\nconst print = { number: n => String(n), add: (a, b) => `(${a.accept(print)} + ${b.accept(print)})` };\nconst tree = add(number(amount), number(2));\nconsole.log(tree.accept(alternate ? print : evaluate));",
+    "question": {
+      "en": "Which change is relatively expensive with Visitor?",
+      "fr": "Quel changement est relativement coûteux avec un visiteur ?"
+    },
+    "answers": {
+      "en": [
+        "Adding a new element type",
+        "Adding a new operation",
+        "Using an existing visitor"
+      ],
+      "fr": [
+        "Ajouter un nouveau type d’élément",
+        "Ajouter une nouvelle opération",
+        "Utiliser un visiteur existant"
+      ]
+    },
+    "correct": 0,
+    "explanation": {
+      "en": "Every visitor needs a method for the new element type.",
+      "fr": "Chaque visiteur nécessite une méthode pour le nouveau type d’élément."
+    },
+    "variant": {
+      "en": "Use print visitor",
+      "fr": "Utiliser le visiteur d’affichage"
+    }
+  }
+]

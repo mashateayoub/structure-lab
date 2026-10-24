@@ -180,19 +180,47 @@ export function treeLayout(root?: TreeItem) {
       position: { x: number; y: number };
     }[] = [],
     edges: Link[] = [];
-  let rank = 0;
-  const visit = (node: TreeItem | undefined, depth: number) => {
+  type Placed = { node: TreeItem; x: number; depth: number };
+  function place(node: TreeItem | undefined): Placed[] {
+    if (!node) return [];
+    const left = place(node.left),
+      right = place(node.right);
+    let distance = 170;
+    for (let d = 0; d < Math.max(left.length, right.length); d++) {
+      const l = left.filter((p) => p.depth === d),
+        r = right.filter((p) => p.depth === d);
+      if (l.length && r.length)
+        distance = Math.max(
+          distance,
+          Math.max(...l.map((p) => p.x)) - Math.min(...r.map((p) => p.x)) + 140,
+        );
+    }
+    return [
+      { node, x: 0, depth: 0 },
+      ...left.map((p) => ({ ...p, x: p.x - distance / 2, depth: p.depth + 1 })),
+      ...right.map((p) => ({
+        ...p,
+        x: p.x + distance / 2,
+        depth: p.depth + 1,
+      })),
+    ];
+  }
+  const positions = place(root),
+    offset = Math.min(0, ...positions.map((p) => p.x));
+  const byId = new Map(positions.map((p) => [p.node.id, p]));
+  function visit(node: TreeItem | undefined) {
     if (!node) return;
-    visit(node.left, depth + 1);
+    visit(node.left);
+    const p = byId.get(node.id)!;
     nodes.push({
       id: node.id,
       data: { label: String(node.value) },
-      position: { x: rank++ * 95, y: depth * 100 },
+      position: { x: p.x - offset, y: p.depth * 145 },
     });
     for (const child of [node.left, node.right])
       if (child) edges.push({ source: node.id, target: child.id });
-    visit(node.right, depth + 1);
-  };
-  visit(root, 0);
+    visit(node.right);
+  }
+  visit(root);
   return { nodes, edges };
 }
