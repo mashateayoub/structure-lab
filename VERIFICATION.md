@@ -1,35 +1,45 @@
-# Verification — 16 October 2026
+# Verification — 24 October 2026
 
-## Passed
+The existing Structures Lab repository was updated in place. This release adds the two-lab landing page, 22-pattern Design Patterns Lab, and English/French support across both labs.
 
-- Node.js 20.20.2 / npm 10.8.2 dependency installation; exact resolutions saved in package-lock.json.
-- `npm test`: **11 tests passed** covering empty/invalid inputs, signed numbers, duplicates, successful/unsuccessful searches, both sorting algorithms, cycle-safe BFS/DFS, disconnected vertices, and empty/skewed BSTs.
-- `npm run build`: TypeScript strict checking and Vite production compilation passed.
-- `TEST_PRODUCTION=1 npm run test:e2e`: **8 browser tests passed** against the compiled production build, using Chromium 156 on Linux (20.9 seconds).
-- Browser coverage: all 17 lessons and quiz feedback; array and stack operations; Object/Map/Set and linked-list operations; binary search; sorting playback; full BFS/DFS visit order; graph selection during playback; BST insertion; directed-edge editing; complexity controls; presentation-mode exit; local Monaco loading; challenge execution; infinite-loop termination and subsequent recovery; quiz persistence; 390px mobile layout.
-- Desktop (1440px) and mobile (390px) screenshots captured. Both layouts were visually inspected during development.
-- The navigation smoke test reported no uncaught page errors across all lessons.
+## Results
 
-## Fixed during verification
+- `npm test`: **67 tests passed** (11 existing algorithm/structure tests, 30 pattern curriculum/example/exercise tests, 2 localization tests, and 24 layout tests).
+- `npm run build`: **passed**, including strict TypeScript checking of application code and a Vite production build.
+- All 22 JavaScript examples and their transpiled TypeScript versions were exercised with inputs 1, 3, and 7 in both modes (132 JS/TS result comparisons).
+- Semantic TypeScript checks on the 22 generated TypeScript examples passed with the editor's non-strict implicit-parameter typing settings; application source uses the project's strict TypeScript configuration.
+- **17 Playwright browser tests passed against the production build** served at `http://127.0.0.1:43818`, using the installed Google Chrome browser on Linux.
+- The earlier 13-test browser suite also passed against the development server; the two added editor checks were verified against production.
+- Dependency installation after upgrading the development test runner to Vitest 4.1.12 reported **0 vulnerabilities**.
+- `git diff --check`: passed.
 
-- Isolated browser tests onto port 43817 so they cannot reuse an unrelated server on the usual preview port.
-- Added explicit select labels and hid decorative navigation glyphs from accessible names.
-- Fixed removal operations being unnecessarily blocked by an invalid add-value field.
-- Decoupled graph traversal state from React Flow measurement/selection changes. Playback now resets only when topology, start vertex, or traversal type changes.
+## Diagram readability update
 
-## Known limits
+All 22 patterns use deliberate role-based placement, spaced connection ports, rounded right-angle routes, readable node sizes, and opaque label backgrounds. Reverse and long delegation routes are kept outside the main hierarchy. Custom nodes support dragging, with Auto arrange and Fit diagram controls. Trees center parents over child subtrees and keep same-level nodes at least 140 layout pixels apart. Graph arrangement handles cycles and disconnected vertices without changing edge order, topology, or traversal state. Sequence diagrams retain a single horizontally scrollable row; large graph diagrams scroll inside their panel and initially center the view on narrow screens.
 
-- Vite reports large chunks because Monaco includes its editor and JavaScript/TypeScript language worker. Monaco is lazy-loaded. Build output is approximately 9 MB uncompressed.
-- Automated browser verification used Chromium; Firefox/Safari and a formal accessibility audit were not run.
-- The teaching trace and code runner limitations are documented in README.md. This release does not require a backend or external editor CDN.
+Browser geometry checks verified that initial node boxes and relationship labels do not overlap in any of the 22 patterns, in both English and French. Checks also verified graph dragging, restoring arrangement during a traversal without resetting progress, and mobile overflow behavior. Screenshots include `preview-pattern-diagram.png` and `preview-tree-mobile.png`.
 
-The release ZIP includes source, tests, configuration, lockfile, screenshots, and the verified dist/ build. node_modules, temporary browser files, and transient test reports are excluded. ZIP integrity and required entries were checked when packaging.
+## Browser coverage
 
-## Docker verification — 19 October 2026
+- All original structure lessons and quizzes, collection mutations, stack underflow, keyed collections, linked lists, tree insertion, graph editing, BFS/DFS, sorting/search playback, performance controls, and presentation mode.
+- Monaco syntax highlighting and automatic language-service completions are verified in both labs, including JavaScript and TypeScript. The checks measure rendered token colors, type a member-access dot, select an actual method suggestion, and confirm the inserted completion.
+- Local Monaco loading, JavaScript execution, deduplication challenge grading, two-second termination of infinite loops, and mobile navigation/progress persistence.
+- Both landing cards, all 22 catalog entries, category filters, bilingual search, and empty search recovery.
+- Every pattern lesson in both English and French: correct title, diagram nodes, relationship stepping, actual experiment execution in both modes, quiz feedback, and persisted completion.
+- Pattern JavaScript/TypeScript editor execution, failing and repaired code exercises, and timeout behavior.
+- French browser-default detection, persisted explicit English selection, FR → EN switching in catalog/details, retained structure quiz progress, and translated dynamic feedback.
+- Landing, catalog, pattern detail, and structure lesson layouts at 390px width, including French labels, without horizontal overflow.
 
-- Built `Dockerfile` successfully on Linux/amd64 with Docker Engine 29.8.2 using `node:22-alpine` and `nginx:stable-alpine`.
-- The image build passed all 11 unit tests, strict TypeScript checking, and Vite compilation.
-- Started the runtime container on host port 43819 mapped to container port 8080. Nginx configuration validation passed; the process ran as UID 101 (`nginx`) and the Docker health check reported `healthy`.
-- All 8 existing Playwright browser tests passed against the running Nginx container (17.7 seconds), including local Monaco workers, code execution, traversal playback and mobile layout.
-- Additional HTTP checks confirmed app HTML, the JavaScript MIME type, immutable caching for hashed assets, revalidation for HTML, and real 404 responses for missing assets.
-- The temporary verification container was stopped after testing. Build and run commands are in the README's Docker section.
+Screenshots were inspected for the dark landing page and responsive presentation. Browser page-error listeners reported no uncaught errors during the full pattern and structure walkthroughs.
+
+## Scope and limits
+
+- Pattern diagrams are simplified relationship maps with labeled arrows, animation, stepping, and text equivalents, not exhaustive formal UML.
+- All 22 patterns have interactive runnable demonstrations, JS/TS examples and quizzes. Six have code repair exercises: Adapter, Composite, Proxy, Command, Observer, and Strategy.
+- The 22-pattern catalog matches the requested reference. Interpreter, from the original 23-pattern GoF book, is not part of that reference catalog.
+- TypeScript is transpiled locally. Code identifiers and runtime values remain stable across languages; application explanations and feedback are localized.
+- The editor/compiler worker assets are large and emit non-failing Vite chunk-size warnings. Editor and compiler loading is deferred until needed.
+- Workers provide bounded synchronous execution, not security isolation for hostile code.
+- Docker deployment files are retained from the existing project. The Docker image was not rebuilt for this release; current verification used local Node and the production Vite output.
+
+The release package includes source, tests, configuration, dependency lockfile, updated screenshots, and the production `dist/` build. Dependencies, repository metadata, scratch files, and transient test reports are excluded.
