@@ -4,7 +4,10 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY . .
-RUN npm test && npm run build
+# Monaco's TypeScript worker exceeds Node's automatic heap budget on small CI hosts.
+# Keep this build-only; the final Nginx image does not run Node.
+ARG NODE_BUILD_HEAP_MB=1536
+RUN npm test && NODE_OPTIONS="--max-old-space-size=${NODE_BUILD_HEAP_MB}" npm run build
 
 # Only compiled assets and the web server are needed at runtime.
 FROM nginx:stable-alpine AS runtime
