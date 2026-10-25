@@ -1,6 +1,8 @@
 # Structure Lab
 
-A complete interactive JavaScript data structures presentation built with React, TypeScript, Vite, Framer Motion, Monaco Editor, and React Flow (`@xyflow/react`). No backend, account, API keys, or editor CDN required.
+An interactive learning workspace with Structures Lab and Design Patterns Lab, built with React, TypeScript, Vite, Framer Motion, Monaco Editor, React Flow (`@xyflow/react`), and i18next/react-i18next. No backend, account, API keys, or editor CDN required.
+
+The original Structures Lab is extended in place: all 17 existing lessons, interactive data structures, algorithm playback, local JavaScript execution, quizzes, presentation mode, and saved answers are retained. A new dark landing page links both labs.
 
 ## Start
 
@@ -23,6 +25,57 @@ npm run preview
 Open the printed preview address (normally http://localhost:4173). Deploy the generated `dist/` directory to a static web host. A prebuilt `dist/` is also included in the release archive. Use an HTTP server; do not double-click `index.html` with a `file://` URL. Relative asset paths support hosting under a subdirectory. The deployment must allow same-origin workers and blob workers for the playground.
 
 For a quick view of the included prebuilt app without installing npm dependencies, run `python3 -m http.server 8080 --directory dist` from the project folder and open http://localhost:8080 (requires Python 3).
+
+## October 24 extension
+
+### Navigation and language
+
+- `/` or `#/`: new home page with two clickable lab cards.
+- `#1` through `#17`: existing structure lessons; original bookmarks remain valid.
+- `#/patterns`: searchable catalog with creation, structure, and behavior category filters.
+- `#/patterns/observer` (and each pattern ID): directly linkable pattern lessons.
+- Use **EN / FR** in the shared header. Language is detected from the browser on first visit and saved under `structure-lab-language`; an explicit selection takes priority on later visits.
+- Both labs include translated explanations, category names, labels, input validation, animation controls, quizzes, challenge instructions, and feedback. Code identifiers and standard runtime data remain stable so examples can be compared across languages. No remote translation service is used.
+- Structure quiz answers retain their existing storage key (`structure-lab-answers`). Pattern quiz progress uses a separate key (`structure-lab-pattern-answers`). Switching languages preserves progress.
+
+### Design Patterns Lab
+
+All 22 patterns in the referenced catalog have original English and French lessons with intent, problem, solution, trade-offs, relationship diagrams, executable JavaScript and TypeScript, an interactive experiment, and a quiz.
+
+| Category | Patterns |
+| --- | --- |
+| Creational (5) | Factory Method, Abstract Factory, Builder, Prototype, Singleton |
+| Structural (7) | Adapter, Bridge, Composite, Decorator, Facade, Flyweight, Proxy |
+| Behavioral (10) | Chain of Responsibility, Command, Iterator, Mediator, Memento, Observer, State, Strategy, Template Method, Visitor |
+
+This follows the **22-pattern catalog requested by the user and used by Refactoring.Guru**; the Interpreter pattern from the original 23-pattern GoF book is outside this requested catalog.
+
+Use **Visualize** to step or play labeled relationships, drag diagram nodes, and inspect the equivalent text view. Pattern diagrams use deliberate role-based layers, independent connection ports, and rounded right-angle connectors. **Auto arrange** restores the layout after dragging; **Fit diagram** recenters the canvas. Large diagrams scroll inside their panel, with readable text retained on small screens. Trees use tidy layouts that center parents over their children; graphs can be arranged into breadth layers without changing their topology or traversal state. Arrays and linked lists keep their sequence on one horizontally scrollable line. Diagrams are intentionally simplified UML-like relationship maps, not formal complete UML models. The input slider and alternative-mode checkbox change actual executable behavior. Select **Run experiment** to observe output. Some alternatives, such as two parsers under Template Method, deliberately produce the same result through different implementations.
+
+Use **Code** to choose JavaScript or TypeScript, edit with syntax highlighting, automatic member completions (or Ctrl+Space), and parameter hints in the locally bundled Monaco editor (or the accessible plain-text alternative), reset, and run. TypeScript is transpiled locally before execution. Code and console output run in fresh dedicated workers with output limits and a two-second timeout. Workers are cancelled when leaving the lesson. This is synchronous local code execution without DOM/import support, not a secure sandbox for untrusted programs.
+
+Six patterns also have a **Practice** code repair tab: Adapter, Composite, Proxy, Command, Observer, and Strategy. Each intentionally broken implementation is checked on inputs 1, 3, and 7 in both modes (six behavior checks), with reset, feedback, and an optional solution. All 22 patterns have quizzes with explanatory feedback; correct answers save completion locally.
+
+Catalog organization is inspired by [Refactoring.Guru](https://refactoring.guru/design-patterns). Lesson prose, examples, exercises, and visual styling are original; no reference-site illustrations or text were copied.
+
+### Project organization
+
+- `src/Root.tsx`: shared navigation, language selector, landing page, and hash routing.
+- `src/App.tsx`, `Demos.tsx`, `engine.ts`, `lessons.ts`, `Playground.tsx`: existing structure lab and its localization integration.
+- `src/Patterns.tsx`, `PatternDiagram.tsx`, `CodeLab.tsx`: pattern catalog, lessons, experiments, diagrams, editor, and practice.
+- `src/patterns.json`: bilingual curriculum with examples, relationships, variants, and quiz definitions.
+- `src/patternEngine.ts`: example generation and practice mutations.
+- `src/execution.ts`: bounded worker execution for pattern experiments and exercises.
+- `src/monaco.ts`: shared local editor setup, JS/TS syntax tokenizers, IntelliSense workers, automatic suggestions, and parameter hints.
+- `src/diagramLayout.ts`, `DiagramNode.tsx`: role-based pattern layouts, cycle-safe graph arrangement, shared nodes, and directional connection ports.
+- `src/i18n.ts`, `fr.json`: i18next resources, language detection/persistence, and localized display feedback.
+- `src/extensions.css`: shared dark theme and responsive extension layouts.
+
+The editor, TypeScript compiler, and language workers are split into lazy-loaded assets. They are large dependencies; the production build reports size warnings for those chunks. The catalog and landing page do not load the code editor until needed. Reduced-motion preferences are respected, and diagram text views and plain-text code editors provide keyboard-accessible alternatives.
+
+### Vérification et démarrage (français)
+
+Installez Node.js **20.19+ ou 22.12+**, puis lancez `npm ci` et `npm run dev`. Ouvrez l’adresse affichée. Les boutons **FR / EN** changent la langue des deux laboratoires et enregistrent votre choix. Le catalogue contient 22 patrons et les leçons de structures existantes restent accessibles. Pour vérifier le projet : `npm test`, `npm run build`, puis `npm run test:e2e` après installation d’un navigateur Playwright. Les exercices de réparation comparent le comportement sur six cas, et les réponses aux quiz sont enregistrées dans le navigateur.
 
 ## Docker
 
@@ -97,7 +150,7 @@ npm run test:e2e
 TEST_PRODUCTION=1 npm run test:e2e
 ```
 
-On Linux, Playwright may require browser system libraries; its installer will describe any missing dependencies. Tests run on port 43817 with a dedicated server. `tests/engine.test.ts` covers parsing, search, sorting, graph cycles/disconnected vertices, and BST invariants. `tests/browser/app.spec.ts` covers lesson navigation, mutations, animation, Monaco, code execution/timeouts, the challenge, mobile layout, and saved progress.
+On Linux, Playwright may require browser system libraries; its installer will describe any missing dependencies. Tests run on port 43817 with a dedicated server. `tests/engine.test.ts` covers parsing, search, sorting, graph cycles/disconnected vertices, and BST invariants. `tests/browser/app.spec.ts` covers lesson navigation, mutations, animation, Monaco, code execution/timeouts, the challenge, mobile layout, and saved progress. `tests/patterns.test.ts` checks curriculum completeness, runnable JS/TS examples, behavioral results, and exercise mutations. `tests/i18n.test.ts` verifies structure-lesson translation coverage and language switching. `tests/browser/extensions.spec.ts` verifies the landing page, all 22 pattern lessons in both languages, search/filters, diagrams, editors, exercises, browser-default detection, persisted language/progress, and mobile layouts. The current release passes 67 unit tests and 17 browser tests.
 
 See `VERIFICATION.md` for results recorded for this release.
 

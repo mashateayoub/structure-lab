@@ -1,17 +1,7 @@
+import { tr } from "./i18n";
 import { useEffect, useRef, useState } from "react";
-import Editor, { loader } from "@monaco-editor/react";
-import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
-import "monaco-editor/esm/vs/language/typescript/monaco.contribution";
-import EditorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
-import TypeScriptWorker from "monaco-editor/esm/vs/language/typescript/ts.worker?worker";
-self.MonacoEnvironment = {
-  getWorker(_id, label) {
-    return label === "typescript" || label === "javascript"
-      ? new TypeScriptWorker()
-      : new EditorWorker();
-  },
-};
-loader.config({ monaco });
+import Editor from "@monaco-editor/react";
+import { editorOptions } from "./monaco";
 const workerSource = `
 self.onmessage = async ({ data }) => {
   const lines = [];
@@ -57,6 +47,13 @@ export default function Playground({
     }
   }
   useEffect(() => () => stop(), []);
+  const previousInitial = useRef(initial);
+  useEffect(() => {
+    setCode((current) =>
+      current === previousInitial.current ? initial : current,
+    );
+    previousInitial.current = initial;
+  }, [initial]);
   function run(test = false) {
     stop();
     setRunning(true);
@@ -86,12 +83,12 @@ export default function Playground({
     <section className="playground">
       <div className="panel-heading">
         <div>
-          <span className="eyebrow">MAKE IT YOURS</span>
-          <h2>JavaScript playground</h2>
+          <span className="eyebrow">{tr("MAKE IT YOURS")}</span>
+          <h2>{tr("JavaScript playground")}</h2>
         </div>
         <div className="button-row">
           <button onClick={() => setPlain(!plain)}>
-            {plain ? "Monaco editor" : "Plain text editor"}
+            {tr(plain ? "Monaco editor" : "Plain text editor")}
           </button>
           <button
             onClick={() => {
@@ -101,56 +98,56 @@ export default function Playground({
               setOutput(["Example restored."]);
             }}
           >
-            Reset code
+            {tr("Reset code")}
           </button>
           <button className="primary" onClick={() => run()}>
-            {running ? "Run again" : "Run code ▶"}
+            {tr(running ? "Run again" : "Run code ▶")}
           </button>
-          {challenge && (
-            <button onClick={() => run(true)}>Check challenge</button>
+          {tr(
+            challenge && (
+              <button onClick={() => run(true)}>{tr("Check challenge")}</button>
+            ),
           )}
         </div>
       </div>
-      {plain ? (
-        <textarea
-          className="plain-editor"
-          aria-label="JavaScript source"
-          value={code}
-          onChange={(e) => setCode(e.target.value)}
-          spellCheck={false}
-        />
-      ) : (
-        <Editor
-          height="300px"
-          language="javascript"
-          theme="vs-dark"
-          value={code}
-          onChange={(v) => setCode(v || "")}
-          loading={
-            <p>Loading local editor… Use Plain text editor if needed.</p>
-          }
-          options={{
-            minimap: { enabled: false },
-            fontSize: 14,
-            scrollBeyondLastLine: false,
-            automaticLayout: true,
-            tabSize: 2,
-            wordWrap: "on",
-            accessibilitySupport: "on",
-            ariaLabel: "JavaScript code editor",
-          }}
-        />
+      {tr(
+        plain ? (
+          <textarea
+            className="plain-editor"
+            aria-label={tr("JavaScript source")}
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            spellCheck={false}
+          />
+        ) : (
+          <Editor
+            height="300px"
+            language="javascript"
+            theme="vs-dark"
+            value={code}
+            onChange={(v) => setCode(v || "")}
+            loading={
+              <p>
+                {tr("Loading local editor… Use Plain text editor if needed.")}
+              </p>
+            }
+            options={{
+              ...editorOptions,
+              ariaLabel: "JavaScript code editor",
+            }}
+          />
+        ),
       )}
       <div className="console">
-        <span className="eyebrow">CONSOLE</span>
+        <span className="eyebrow">{tr("CONSOLE")}</span>
         <pre role="log" aria-live="polite">
-          {output.join("\n")}
+          {tr(output.join("\n"))}
         </pre>
       </div>
       <p className="fine-print">
-        Runs synchronous JavaScript in a dedicated worker with a 2-second limit.
-        No DOM or imports. Treat the playground as local code execution, not a
-        security sandbox for untrusted programs.
+        {tr(
+          "Runs synchronous JavaScript in a dedicated worker with a 2-second limit. No DOM or imports. Treat the playground as local code execution, not a security sandbox for untrusted programs.",
+        )}
       </p>
     </section>
   );
