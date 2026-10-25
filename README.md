@@ -26,6 +26,18 @@ Open the printed preview address (normally http://localhost:4173). Deploy the ge
 
 For a quick view of the included prebuilt app without installing npm dependencies, run `python3 -m http.server 8080 --directory dist` from the project folder and open http://localhost:8080 (requires Python 3).
 
+### Docker build memory
+
+The production Docker build runs all tests before bundling and gives Node a 1536 MiB old-space budget for the build only. Monaco's local TypeScript worker needs more than the automatic roughly 1 GiB budget selected on small CI hosts. The final image still contains only Nginx and compiled assets.
+
+```sh
+docker build -t structure-lab .
+# For a larger build host, override the build-only budget when needed:
+# docker build --build-arg NODE_BUILD_HEAP_MB=2048 -t structure-lab .
+```
+
+The heap budget is not a total memory limit: the measured build can approach 2 GiB RSS, and the host also needs room for Jenkins, Docker and the OS. A 2 GiB Jenkins host needs available swap and a single build executor for this workload; the larger override needs more available memory. Runtime environment variables and refreshing Launchdeck setup do not change this Docker build budget.
+
 ## October 24 extension
 
 ### Navigation and language
